@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 from flask import Flask, request, jsonify, render_template, send_file, session
 from werkzeug.utils import secure_filename
-from datetime import datetime
 import traceback
 
 app = Flask(__name__)
@@ -17,6 +16,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['CLEANED_FOLDER'] = 'cleaned'
 app.config['CHARTS_FOLDER'] = 'charts'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
 # Create runtime folders
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -100,11 +100,11 @@ def generate_eda_report(df):
     numeric_stats = {}
     for col in numeric_cols:
         numeric_stats[col] = {
-            'mean': df[col].mean(),
-            'median': df[col].median(),
-            'std': df[col].std(),
-            'min': df[col].min(),
-            'max': df[col].max()
+            'mean': float(df[col].mean()) if not pd.isna(df[col].mean()) else 0,
+            'median': float(df[col].median()) if not pd.isna(df[col].median()) else 0,
+            'std': float(df[col].std()) if not pd.isna(df[col].std()) else 0,
+            'min': float(df[col].min()) if not pd.isna(df[col].min()) else 0,
+            'max': float(df[col].max()) if not pd.isna(df[col].max()) else 0
         }
     return {
         'total_rows': total_rows, 'total_cols': total_cols,
@@ -121,16 +121,16 @@ def generate_correlation_heatmap(df):
         fig = go.Figure(data=go.Heatmap(
             z=corr.values, x=corr.columns, y=corr.columns,
             colorscale='RdBu', zmin=-1, zmax=1,
-            text=corr.round(2).values, texttemplate='%{text}'
+            text=corr.round(2).values, texttemplate='%{text}', textfont={"size": 10}
         ))
-        fig.update_layout(title='Correlation Heatmap', height=500)
+        fig.update_layout(title='Correlation Heatmap', height=500, template='plotly_dark')
         return fig
     return None
 
 def generate_histograms(df):
     figs = []
     for col in df.select_dtypes(include=[np.number]).columns[:3]:
-        fig = px.histogram(df, x=col, title=f'Distribution of {col}', nbins=30)
+        fig = px.histogram(df, x=col, title=f'Distribution of {col}', nbins=30, template='plotly_dark')
         figs.append(fig)
     return figs
 
@@ -139,7 +139,8 @@ def generate_bar_chart(df):
     if len(cat_cols) > 0:
         col = cat_cols[0]
         counts = df[col].value_counts().head(10)
-        fig = px.bar(x=counts.index, y=counts.values, title=f'Top 10 in {col}')
+        fig = px.bar(x=counts.index, y=counts.values, title=f'Top 10 in {col}', template='plotly_dark')
+        fig.update_layout(xaxis_title=col, yaxis_title='Count')
         return fig
     return None
 
@@ -148,7 +149,7 @@ def generate_pie_chart(df):
     if len(cat_cols) > 0:
         col = cat_cols[0]
         counts = df[col].value_counts().head(5)
-        fig = px.pie(values=counts.values, names=counts.index, title=f'{col} Distribution')
+        fig = px.pie(values=counts.values, names=counts.index, title=f'{col} Distribution', template='plotly_dark')
         return fig
     return None
 
@@ -158,7 +159,7 @@ def generate_line_chart(df):
     if len(date_cols) > 0 and len(num_cols) > 0:
         df_sorted = df.sort_values(date_cols[0])
         fig = px.line(df_sorted, x=date_cols[0], y=num_cols[0],
-                      title=f'Trend: {num_cols[0]} over {date_cols[0]}')
+                      title=f'Trend: {num_cols[0]} over {date_cols[0]}', template='plotly_dark')
         return fig
     return None
 
@@ -166,7 +167,7 @@ def generate_scatter_plot(df):
     num_cols = df.select_dtypes(include=[np.number]).columns
     if len(num_cols) >= 2:
         fig = px.scatter(df, x=num_cols[0], y=num_cols[1],
-                         title=f'{num_cols[0]} vs {num_cols[1]}')
+                         title=f'{num_cols[0]} vs {num_cols[1]}', template='plotly_dark')
         return fig
     return None
 
@@ -220,35 +221,39 @@ def generate_all_charts(df):
 # ------------------------- AI Insights -------------------------
 def generate_insights(df):
     if not gemini_model:
-        return "Gemini API key missing. Add GEMINI_API_KEY environment variable."
+        return "⚠️ Gemini API key missing. Please add GEMINI_API_KEY environment variable to enable AI insights."
     
     eda = generate_eda_report(df)
     context = f"""
-Dataset: {eda['total_rows']} rows, {eda['total_cols']} columns
-Numeric: {', '.join(eda['numeric_cols'])}
-Categorical: {', '.join(eda['categorical_cols'])}
-Dates: {', '.join(eda['date_cols'])}
-Missing values: {eda['missing_values']}
-Sample: {df.head(3).to_string()}
+Dataset Summary:
+- {eda['total_rows']} rows, {eda['total_cols']} columns
+- Numeric columns: {', '.join(eda['numeric_cols'][:5])}
+- Categorical columns: {', '.join(eda['categorical_cols'][:5])}
+- Date columns: {', '.join(eda['date_cols'])}
+- Missing values: {eda['missing_values']}
 """
-    prompt = f"""You are a senior business analyst. Write 4-5 paragraphs of insights, trends, risks, and recommendations based on this data. Professional tone.
+    prompt = f"""As a senior business analyst, provide 3-4 paragraphs of professional insights, trends, and actionable recommendations based on this dataset.
 
 {context}
+
+Focus on: key patterns, business opportunities, potential risks, and strategic recommendations.
+
 Insights:"""
     try:
-        resp = gemini_model.generate_content(prompt)
-        return resp.text
+        response = gemini_model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"AI error: {str(e)}"
+        return f"AI Error: {str(e)}. Please check your API key."
 
 def answer_question(df, question):
     if not gemini_model:
-        return "AI disabled: No API key."
-    context = f"Columns: {list(df.columns)}\nFirst rows:\n{df.head(5).to_string()}"
-    prompt = f"Answer the question based on this data.\nData:\n{context}\nQuestion: {question}\nAnswer:"
+        return "AI features disabled. Please configure GEMINI_API_KEY."
+    
+    context = f"Dataset has {len(df)} rows and columns: {', '.join(list(df.columns)[:10])}"
+    prompt = f"Based on the dataset with {context}, answer: {question}\nAnswer concisely:"
     try:
-        resp = gemini_model.generate_content(prompt)
-        return resp.text
+        response = gemini_model.generate_content(prompt)
+        return response.text
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -259,93 +264,130 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    ext = file.filename.split('.')[-1].lower()
-    uid = str(uuid.uuid4())[:8]
-    orig_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{uid}_{secure_filename(file.filename)}')
-    file.save(orig_path)
-    
     try:
-        if ext in ['xlsx', 'xls']:
-            df = pd.read_excel(orig_path)
-        else:
-            df = pd.read_csv(orig_path)
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        ext = file.filename.split('.')[-1].lower()
+        if ext not in ['csv', 'xlsx', 'xls']:
+            return jsonify({'error': 'Invalid file type. Please upload CSV or Excel file'}), 400
+        
+        uid = str(uuid.uuid4())[:8]
+        filename = secure_filename(f"{uid}_{file.filename}")
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        
+        # Read file
+        try:
+            if ext in ['xlsx', 'xls']:
+                df = pd.read_excel(filepath)
+            else:
+                df = pd.read_csv(filepath, encoding='utf-8')
+        except Exception as e:
+            return jsonify({'error': f'Error reading file: {str(e)}'}), 400
+        
+        # Clean data
+        cleaned_df = clean_data(df)
+        cleaned_path = os.path.join(app.config['CLEANED_FOLDER'], f'{uid}_cleaned.csv')
+        cleaned_df.to_csv(cleaned_path, index=False)
+        
+        session['cleaned_file'] = cleaned_path
+        session['data_id'] = uid
+        
+        # Generate all outputs
+        eda = generate_eda_report(cleaned_df)
+        charts = generate_all_charts(cleaned_df)
+        insights = generate_insights(cleaned_df)
+        session['insights'] = insights
+        
+        # Prepare preview (convert to serializable format)
+        preview = cleaned_df.head(100).fillna('').to_dict(orient='records')
+        columns = list(cleaned_df.columns)
+        
+        # Prepare chart data for frontend
+        chart_data = []
+        for title, json_str, file_path in charts:
+            chart_data.append({
+                'title': title,
+                'json': json_str,
+                'file': os.path.basename(file_path)
+            })
+        
+        kpis = {
+            'total_rows': eda['total_rows'],
+            'total_cols': eda['total_cols'],
+            'missing_values': int(eda['missing_values']),
+            'duplicates': int(eda['duplicates']),
+            'numeric_cols_count': len(eda['numeric_cols'])
+        }
+        
+        return jsonify({
+            'success': True,
+            'kpis': kpis,
+            'preview': preview,
+            'columns': columns,
+            'charts': chart_data,
+            'insights': insights,
+            'data_id': uid
+        })
+        
     except Exception as e:
-        return jsonify({'error': f'Read error: {str(e)}'}), 400
-    
-    cleaned_df = clean_data(df)
-    cleaned_path = os.path.join(app.config['CLEANED_FOLDER'], f'{uid}_cleaned.csv')
-    cleaned_df.to_csv(cleaned_path, index=False)
-    
-    session['cleaned_file'] = cleaned_path
-    session['data_id'] = uid
-    
-    eda = generate_eda_report(cleaned_df)
-    charts = generate_all_charts(cleaned_df)
-    insights = generate_insights(cleaned_df)
-    session['insights'] = insights
-    
-    preview = cleaned_df.head(100).to_dict(orient='records')
-    columns = list(cleaned_df.columns)
-    kpis = {
-        'total_rows': eda['total_rows'],
-        'total_cols': eda['total_cols'],
-        'missing_values': eda['missing_values'],
-        'duplicates': eda['duplicates'],
-        'numeric_cols_count': len(eda['numeric_cols'])
-    }
-    
-    chart_data = [{'title': t, 'json': j, 'file': f} for t, j, f in charts]
-    
-    return jsonify({
-        'success': True, 'eda': eda, 'kpis': kpis,
-        'preview': preview, 'columns': columns,
-        'charts': chart_data, 'insights': insights, 'data_id': uid
-    })
+        print(f"Upload error: {traceback.format_exc()}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/ask', methods=['POST'])
 def ask():
-    data = request.get_json()
-    question = data.get('question', '')
-    if not question:
-        return jsonify({'error': 'No question'}), 400
-    cleaned_file = session.get('cleaned_file')
-    if not cleaned_file or not os.path.exists(cleaned_file):
-        return jsonify({'error': 'No dataset loaded'}), 400
-    df = pd.read_csv(cleaned_file)
-    answer = answer_question(df, question)
-    return jsonify({'answer': answer})
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid request'}), 400
+            
+        question = data.get('question', '')
+        if not question:
+            return jsonify({'error': 'No question provided'}), 400
+        
+        cleaned_file = session.get('cleaned_file')
+        if not cleaned_file or not os.path.exists(cleaned_file):
+            return jsonify({'error': 'No dataset loaded. Please upload a file first.'}), 400
+        
+        df = pd.read_csv(cleaned_file)
+        answer = answer_question(df, question)
+        return jsonify({'answer': answer})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/download-cleaned')
 def download_cleaned():
-    path = session.get('cleaned_file')
-    if not path or not os.path.exists(path):
-        return "No cleaned file", 404
-    return send_file(path, as_attachment=True, download_name='cleaned_data.csv')
+    cleaned_file = session.get('cleaned_file')
+    if not cleaned_file or not os.path.exists(cleaned_file):
+        return "No cleaned file available. Please upload a dataset first.", 404
+    return send_file(cleaned_file, as_attachment=True, download_name='cleaned_data.csv')
 
 @app.route('/download-insights')
 def download_insights():
     insights = session.get('insights', '')
     if not insights:
-        return "No insights", 404
-    from io import StringIO
-    si = StringIO()
-    si.write(insights)
-    si.seek(0)
-    return send_file(si, as_attachment=True, download_name='ai_insights.txt', mimetype='text/plain')
+        return "No insights available. Please upload a dataset first.", 404
+    
+    from io import BytesIO
+    output = BytesIO()
+    output.write(insights.encode('utf-8'))
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='ai_insights.txt', mimetype='text/plain')
 
 @app.route('/download-chart/<filename>')
 def download_chart(filename):
-    safe_path = os.path.join(app.config['CHARTS_FOLDER'], os.path.basename(filename))
+    safe_path = os.path.join(app.config['CHARTS_FOLDER'], filename)
     if os.path.exists(safe_path):
         return send_file(safe_path, as_attachment=True, download_name=filename)
-    return "Not found", 404
+    return "Chart not found", 404
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
+
