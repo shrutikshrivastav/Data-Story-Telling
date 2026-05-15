@@ -1,156 +1,295 @@
-import os
-import io
-import base64
-import json
-from datetime import datetime
-import pandas as pd
-import numpy as np
-import plotly
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from flask import Flask, render_template, request, jsonify
-import warnings
-warnings.filterwarnings('ignore')
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus BI | AI Data Storytelling</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        dark: '#0f172a',
+                        card: 'rgba(30, 41, 59, 0.7)',
+                        primary: '#3b82f6',
+                        accent: '#8b5cf6'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid #8b5cf6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden selection:bg-accent selection:text-white pb-20">
 
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+    <nav class="glass-panel sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
+                <i class="fas fa-layer-group text-white text-sm"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Nexus BI</h1>
+        </div>
+        <div class="text-sm font-medium text-slate-400">Automated Analytics Engine</div>
+    </nav>
 
-def convert_to_native_types(obj):
-    """Convert numpy types to native Python types for JSON serialization"""
-    if isinstance(obj, (np.integer,)):
-        return int(obj)
-    elif isinstance(obj, (np.floating,)):
-        return float(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, pd.Timestamp):
-        return str(obj)
-    elif isinstance(obj, dict):
-        return {key: convert_to_native_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_to_native_types(item) for item in obj]
-    elif isinstance(obj, tuple):
-        return tuple(convert_to_native_types(item) for item in obj)
-    return obj
-
-def normalize_columns(df):
-    """Normalize column names"""
-    df.columns = [col.strip().lower().replace(' ', '_').replace('-', '_') for col in df.columns]
-    return df
-
-def detect_date_columns(df):
-    """Detect and convert date columns"""
-    date_columns = []
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            try:
-                pd.to_datetime(df[col], errors='raise')
-                date_columns.append(col)
-            except:
-                pass
-    return date_columns
-
-def clean_data(df):
-    """Clean the dataset and return cleaned dataframe with stats"""
-    stats = {
-        'original_rows': int(len(df)),
-        'original_columns': int(len(df.columns)),
-        'duplicates_removed': int(0),
-        'missing_values_fixed': int(0),
-        'outliers_detected': int(0),
-        'data_quality_score': float(0)
-    }
-    
-    df = normalize_columns(df)
-    duplicates = int(df.duplicated().sum())
-    df = df.drop_duplicates()
-    stats['duplicates_removed'] = duplicates
-    
-    df = df.dropna(how='all')
-    missing_before = int(df.isnull().sum().sum())
-    
-    for col in df.columns:
-        if df[col].dtype in ['int64', 'float64']:
-            df[col] = df[col].fillna(df[col].median())
-        else:
-            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
-    
-    stats['missing_values_fixed'] = missing_before
-    
-    date_columns = detect_date_columns(df)
-    for col in date_columns:
-        try:
-            df[col] = pd.to_datetime(df[col])
-        except:
-            pass
-    
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            try:
-                df[col] = pd.to_numeric(df[col])
-            except:
-                pass
-    
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    outliers_count = 0
-    for col in numeric_columns:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        outliers = int(df[(df[col] < lower_bound) | (df[col] > upper_bound)].shape[0])
-        outliers_count += outliers
-    stats['outliers_detected'] = outliers_count
-    
-    total_cells = int(stats['original_rows'] * stats['original_columns'])
-    issues = int(stats['duplicates_removed'] + stats['missing_values_fixed'] + stats['outliers_detected'])
-    if total_cells > 0:
-        score = max(0, 100 - (issues / total_cells * 100))
-    else:
-        score = 100
-    stats['data_quality_score'] = float(round(min(100, score), 1))
-    
-    stats = convert_to_native_types(stats)
-    return df, stats
-
-def identify_columns(df):
-    """Identify numeric and categorical columns"""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
-    return numeric_cols, categorical_cols, date_cols
-
-def generate_visualizations(df):
-    """Generate interactive Plotly charts with professional styling"""
-    numeric_cols, categorical_cols, date_cols = identify_columns(df)
-    charts = []
-    
-    # Professional color palette
-    colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', 
-              '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4']
-    
-    # Bar Chart
-    if categorical_cols and numeric_cols:
-        try:
-            cat_col = categorical_cols[0]
-            num_col = numeric_cols[0]
-            grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=False).head(10)
+    <main class="container mx-auto px-4 mt-10 max-w-7xl">
+        
+        <div id="upload-section" class="max-w-2xl mx-auto text-center mt-20 animate-fade-in">
+            <h2 class="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                Transform Data into Stories
+            </h2>
+            <p class="text-slate-400 mb-8 text-lg">Upload your CSV or Excel file to automatically clean, visualize, and extract executive insights.</p>
             
-            fig = go.Figure(data=[
-                go.Bar(
-                    x=grouped.index.astype(str),
-                    y=grouped.values,
-                    marker_color=colors[:len(grouped)],
-                    marker_line_color='white',
-                    marker_line_width=1,
-                    text=grouped.values.round(2),
-                    textposition='outside',
-                    textfont=dict(size=11, color='#334155')
-                )
-            ])
-            fig.update_layout(
-                title=dict(text=f'Top 10 {cat_col} by {num_col}', font=dict(size=16, color='#1e293b')),
-                template='plotly_white',
-                plot_bgcolor='#faf
+            <div id="drop-zone" class="glass-panel border-dashed border-2 border-slate-600 rounded-2xl p-12 transition-all duration-300 hover:border-accent hover:bg-slate-800/50 cursor-pointer relative overflow-hidden group">
+                <input type="file" id="file-input" accept=".csv, .xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                <div class="flex flex-col items-center gap-4 pointer-events-none">
+                    <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <i class="fas fa-cloud-upload-alt text-3xl text-accent"></i>
+                    </div>
+                    <div>
+                        <p class="text-lg font-semibold text-white">Drag & drop your dataset here</p>
+                        <p class="text-sm text-slate-400 mt-1">Supports .csv, .xlsx, .xls (Max 50MB)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loading-state" class="hidden flex-col items-center justify-center mt-12 space-y-4">
+                <div class="loader"></div>
+                <p class="text-slate-300 font-medium animate-pulse" id="loading-text">Initializing AI Engine...</p>
+            </div>
+        </div>
+
+        <div id="dashboard" class="hidden mt-10 space-y-12 pb-12">
+            
+            <section class="animate-fade-in" style="animation-delay: 0.1s;">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold border border-blue-500/30">1</span>
+                    <h2 class="text-2xl font-bold text-white">Data Quality & Cleaning</h2>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="glass-panel rounded-xl p-5 border-t-4 border-t-emerald-500 hover:-translate-y-1 transition-transform">
+                        <div class="text-slate-400 text-sm font-medium mb-1">Quality Score</div>
+                        <div class="text-3xl font-bold text-white" id="stat-score">--</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 border-t-4 border-t-blue-500 hover:-translate-y-1 transition-transform">
+                        <div class="text-slate-400 text-sm font-medium mb-1">Rows Analyzed</div>
+                        <div class="text-3xl font-bold text-white" id="stat-rows">--</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 border-t-4 border-t-purple-500 hover:-translate-y-1 transition-transform">
+                        <div class="text-slate-400 text-sm font-medium mb-1">Anomalies Fixed</div>
+                        <div class="text-3xl font-bold text-white" id="stat-fixed">--</div>
+                    </div>
+                    <div class="glass-panel rounded-xl p-5 border-t-4 border-t-rose-500 hover:-translate-y-1 transition-transform">
+                        <div class="text-slate-400 text-sm font-medium mb-1">Duplicates Removed</div>
+                        <div class="text-3xl font-bold text-white" id="stat-dupes">--</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="animate-fade-in" style="animation-delay: 0.3s;">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm font-bold border border-purple-500/30">2</span>
+                    <h2 class="text-2xl font-bold text-white">Visual Analytics</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="charts-container">
+                    </div>
+            </section>
+
+            <section class="animate-fade-in" style="animation-delay: 0.5s;">
+                <div class="flex items-center gap-3 mb-6">
+                    <span class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-sm font-bold border border-amber-500/30">3</span>
+                    <h2 class="text-2xl font-bold text-white">Executive Narrative</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="narrative-container">
+                    </div>
+            </section>
+
+            <div class="text-center mt-12">
+                <button onclick="location.reload()" class="bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-full font-medium transition-all duration-300 border border-white/20 shadow-lg hover:shadow-xl flex items-center gap-2 mx-auto">
+                    <i class="fas fa-redo text-sm"></i> Analyze New Dataset
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const uploadSection = document.getElementById('upload-section');
+        const loadingState = document.getElementById('loading-state');
+        const loadingText = document.getElementById('loading-text');
+        const dashboard = document.getElementById('dashboard');
+
+        // Handle File Selection
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        });
+
+        // Drag & Drop Styling
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-accent', 'bg-slate-800/80'), false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-accent', 'bg-slate-800/80'), false);
+        });
+        dropZone.addEventListener('drop', (e) => {
+            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+        }, false);
+
+        // Upload Logic
+        async function processFile(file) {
+            dropZone.style.display = 'none';
+            loadingState.style.display = 'flex';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Simulation of AI processing steps for UX
+            const loadingMessages = ["Cleaning dataset...", "Detecting outliers...", "Generating visualizations...", "Writing narrative..."];
+            let msgIdx = 0;
+            const msgInterval = setInterval(() => {
+                msgIdx = (msgIdx + 1) % loadingMessages.length;
+                loadingText.innerText = loadingMessages[msgIdx];
+            }, 1500);
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                clearInterval(msgInterval);
+                
+                if (!response.ok) throw new Error(data.error || 'Upload failed');
+                
+                uploadSection.style.display = 'none';
+                populateDashboard(data);
+                dashboard.style.display = 'block';
+
+                // Trigger Plotly relayout to ensure responsiveness after rendering
+                setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+
+            } catch (error) {
+                clearInterval(msgInterval);
+                alert('Error: ' + error.message);
+                dropZone.style.display = 'block';
+                loadingState.style.display = 'none';
+            }
+        }
+
+        // Populate Dashboard
+        function populateDashboard(data) {
+            // 1. Data Summary
+            animateValue("stat-score", 0, data.summary.quality_score, 1500, "%");
+            animateValue("stat-rows", 0, data.summary.final_rows, 1000);
+            animateValue("stat-fixed", 0, data.summary.missing_fixed + data.summary.outliers_detected, 1200);
+            animateValue("stat-dupes", 0, data.summary.duplicates_removed, 800);
+
+            // 2. Charts
+            const chartsContainer = document.getElementById('charts-container');
+            chartsContainer.innerHTML = '';
+            const config = { responsive: true, displayModeBar: false };
+            
+            Object.keys(data.charts).forEach(key => {
+                const chartDiv = document.createElement('div');
+                chartDiv.className = 'glass-panel rounded-xl p-4 min-h-[350px] relative w-full overflow-hidden';
+                chartDiv.id = `chart-${key}`;
+                
+                // Add chart to DOM
+                chartsContainer.appendChild(chartDiv);
+                
+                // Render Plotly
+                const chartData = data.charts[key];
+                Plotly.newPlot(chartDiv.id, chartData.data, chartData.layout, config);
+            });
+
+            // 3. Narrative
+            const narrativeContainer = document.getElementById('narrative-container');
+            narrativeContainer.innerHTML = '';
+            
+            data.narrative.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel rounded-xl p-6 relative overflow-hidden group hover:border-white/30 transition-colors';
+                card.innerHTML = `
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-accent/20 transition-colors"></div>
+                    <div class="flex items-start gap-4 relative z-10">
+                        <div class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                            <i class="${item.icon} text-accent"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">${item.title}</h3>
+                            <p class="text-slate-300 leading-relaxed text-sm">${item.text}</p>
+                        </div>
+                    </div>
+                `;
+                narrativeContainer.appendChild(card);
+            });
+        }
+
+        // Number Animation Helper
+        function animateValue(id, start, end, duration, suffix = "") {
+            if (start === end) { document.getElementById(id).innerHTML = end + suffix; return; }
+            let range = end - start;
+            let current = start;
+            let increment = end > start ? 1 : -1;
+            let stepTime = Math.abs(Math.floor(duration / range));
+            if(stepTime < 5) stepTime = 5; // Cap speed
+            let obj = document.getElementById(id);
+            let timer = setInterval(function() {
+                current += increment;
+                // Add commas for large numbers
+                obj.innerHTML = current.toLocaleString() + suffix;
+                if (current == end) {
+                    clearInterval(timer);
+                }
+            }, stepTime);
+        }
+    </script>
+</body>
+</html>
