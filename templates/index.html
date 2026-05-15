@@ -1,518 +1,156 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataStory AI - Intelligent Data Storytelling</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
-        * { font-family: 'Inter', sans-serif; }
-        
-        body {
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
-            min-height: 100vh;
-        }
-        
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px;
-        }
-        
-        .glass-card {
-            background: rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 20px;
-            transition: all 0.3s ease;
-        }
-        
-        .glass-card:hover {
-            background: rgba(255, 255, 255, 0.12);
-            transform: translateY(-2px);
-            box-shadow: 0 20px 60px rgba(0, 255, 136, 0.1);
-        }
-        
-        .gradient-text {
-            background: linear-gradient(135deg, #00ff88 0%, #00b4d8 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .upload-zone {
-            border: 2px dashed rgba(0, 255, 136, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: #00ff88;
-            background: rgba(0, 255, 136, 0.05);
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        .pulse { animation: pulse 2s infinite; }
-        
-        .fade-in {
-            animation: fadeIn 0.6s ease-in;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .stat-card {
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stat-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #00ff88, #00b4d8);
-        }
-        
-        .loading-spinner {
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid #00ff88;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .chart-container {
-            min-height: 400px;
-        }
-        
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: rgba(0, 255, 136, 0.3);
-            border-radius: 4px;
-        }
-    </style>
-</head>
-<body>
-    <!-- Header -->
-    <header class="glass m-4 p-6">
-        <div class="container mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-chart-line text-white text-2xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-3xl font-bold gradient-text">DataStory AI</h1>
-                    <p class="text-gray-400 text-sm">Intelligent Data Storytelling Platform</p>
-                </div>
-            </div>
-            <div class="hidden md:flex items-center space-x-4 text-sm text-gray-400">
-                <span class="flex items-center"><i class="fas fa-database mr-2 text-green-400"></i> DATA</span>
-                <span class="flex items-center"><i class="fas fa-chart-bar mr-2 text-blue-400"></i> VISUALIZATION</span>
-                <span class="flex items-center"><i class="fas fa-brain mr-2 text-purple-400"></i> NARRATIVE</span>
-            </div>
-        </div>
-    </header>
+import os
+import io
+import base64
+import json
+from datetime import datetime
+import pandas as pd
+import numpy as np
+import plotly
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from flask import Flask, render_template, request, jsonify
+import warnings
+warnings.filterwarnings('ignore')
 
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 pb-12">
-        <!-- Upload Section -->
-        <section id="upload-section" class="glass p-8 mb-8">
-            <div class="text-center mb-6">
-                <h2 class="text-2xl font-bold text-white mb-2">Upload Your Dataset</h2>
-                <p class="text-gray-400">Support CSV and Excel files. Drag & drop or click to browse.</p>
-            </div>
-            
-            <div id="upload-zone" class="upload-zone rounded-2xl p-12 text-center cursor-pointer transition-all">
-                <div class="mb-4">
-                    <i class="fas fa-cloud-upload-alt text-6xl gradient-text"></i>
-                </div>
-                <p class="text-white text-lg font-semibold mb-2">Drop your file here</p>
-                <p class="text-gray-500 text-sm">or click to browse</p>
-                <input type="file" id="file-input" class="hidden" accept=".csv,.xls,.xlsx">
-            </div>
-            
-            <div id="file-info" class="mt-4 hidden">
-                <div class="glass-card p-4 flex items-center justify-between">
-                    <div class="flex items-center space-x-3">
-                        <i class="fas fa-file-excel text-green-400 text-2xl"></i>
-                        <div>
-                            <p id="file-name" class="text-white font-semibold"></p>
-                            <p id="file-size" class="text-gray-400 text-sm"></p>
-                        </div>
-                    </div>
-                    <button onclick="processFile()" class="px-6 py-2 bg-gradient-to-r from-green-400 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all">
-                        Analyze Data
-                    </button>
-                </div>
-            </div>
-        </section>
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-        <!-- Loading -->
-        <div id="loading" class="hidden text-center py-12">
-            <div class="loading-spinner mx-auto mb-4"></div>
-            <p class="text-gray-400">Processing your data...</p>
-            <p class="text-gray-500 text-sm">Cleaning, analyzing, and generating insights</p>
-        </div>
+def convert_to_native_types(obj):
+    """Convert numpy types to native Python types for JSON serialization"""
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, pd.Timestamp):
+        return str(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_to_native_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_native_types(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(convert_to_native_types(item) for item in obj)
+    return obj
 
-        <!-- Results Dashboard -->
-        <div id="dashboard" class="hidden space-y-8">
-            <!-- Phase 1: Data Quality -->
-            <section id="data-phase" class="fade-in">
-                <div class="flex items-center mb-6">
-                    <div class="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-600 rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-broom text-white"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-white">Phase 1: Data Cleaning & Quality</h2>
-                </div>
-                
-                <!-- Quality Score -->
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                    <div class="glass-card stat-card p-6 col-span-2">
-                        <h3 class="text-gray-400 text-sm mb-2">Data Quality Score</h3>
-                        <div class="flex items-end space-x-2">
-                            <span id="quality-score" class="text-5xl font-bold gradient-text">0</span>
-                            <span class="text-gray-400 mb-2">/100</span>
-                        </div>
-                        <div class="mt-3 bg-gray-800 rounded-full h-2">
-                            <div id="quality-bar" class="bg-gradient-to-r from-green-400 to-blue-500 h-2 rounded-full transition-all duration-1000" style="width: 0%"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="glass-card stat-card p-6">
-                        <h3 class="text-gray-400 text-sm mb-2">Total Rows</h3>
-                        <p id="total-rows" class="text-3xl font-bold text-white">0</p>
-                        <p class="text-xs text-gray-500 mt-2">After cleaning</p>
-                    </div>
-                    
-                    <div class="glass-card stat-card p-6">
-                        <h3 class="text-gray-400 text-sm mb-2">Duplicates</h3>
-                        <p id="duplicates-removed" class="text-3xl font-bold text-red-400">0</p>
-                        <p class="text-xs text-gray-500 mt-2">Removed</p>
-                    </div>
-                    
-                    <div class="glass-card stat-card p-6">
-                        <h3 class="text-gray-400 text-sm mb-2">Missing Values</h3>
-                        <p id="missing-fixed" class="text-3xl font-bold text-yellow-400">0</p>
-                        <p class="text-xs text-gray-500 mt-2">Fixed</p>
-                    </div>
-                </div>
-                
-                <!-- Before/After Comparison -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="glass-card p-6">
-                        <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <i class="fas fa-database text-gray-400 mr-2"></i> Before Cleaning
-                        </h3>
-                        <div class="space-y-3">
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Rows</span>
-                                <span id="before-rows" class="text-white">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Columns</span>
-                                <span id="before-cols" class="text-white">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Missing Values</span>
-                                <span id="before-missing" class="text-red-400">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Duplicates</span>
-                                <span id="before-dupes" class="text-red-400">0</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="glass-card p-6">
-                        <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <i class="fas fa-check-circle text-green-400 mr-2"></i> After Cleaning
-                        </h3>
-                        <div class="space-y-3">
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Rows</span>
-                                <span id="after-rows" class="text-green-400">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Columns</span>
-                                <span id="after-cols" class="text-green-400">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Numeric Columns</span>
-                                <span id="numeric-cols" class="text-blue-400">0</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-400">Categorical Columns</span>
-                                <span id="categorical-cols" class="text-purple-400">0</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+def normalize_columns(df):
+    """Normalize column names"""
+    df.columns = [col.strip().lower().replace(' ', '_').replace('-', '_') for col in df.columns]
+    return df
 
-            <!-- Phase 2: Visualizations -->
-            <section id="viz-phase" class="fade-in">
-                <div class="flex items-center mb-6">
-                    <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-600 rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-chart-pie text-white"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-white">Phase 2: Interactive Visualizations</h2>
-                </div>
-                
-                <div id="charts-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Charts will be dynamically inserted here -->
-                </div>
-            </section>
+def detect_date_columns(df):
+    """Detect and convert date columns"""
+    date_columns = []
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            try:
+                pd.to_datetime(df[col], errors='raise')
+                date_columns.append(col)
+            except:
+                pass
+    return date_columns
 
-            <!-- Phase 3: Narrative -->
-            <section id="narrative-phase" class="fade-in">
-                <div class="flex items-center mb-6">
-                    <div class="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-600 rounded-xl flex items-center justify-center mr-3">
-                        <i class="fas fa-lightbulb text-white"></i>
-                    </div>
-                    <h2 class="text-2xl font-bold text-white">Phase 3: AI-Powered Insights</h2>
-                </div>
-                
-                <div id="insights-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Insights will be dynamically inserted here -->
-                </div>
-            </section>
+def clean_data(df):
+    """Clean the dataset and return cleaned dataframe with stats"""
+    stats = {
+        'original_rows': int(len(df)),
+        'original_columns': int(len(df.columns)),
+        'duplicates_removed': int(0),
+        'missing_values_fixed': int(0),
+        'outliers_detected': int(0),
+        'data_quality_score': float(0)
+    }
+    
+    df = normalize_columns(df)
+    duplicates = int(df.duplicated().sum())
+    df = df.drop_duplicates()
+    stats['duplicates_removed'] = duplicates
+    
+    df = df.dropna(how='all')
+    missing_before = int(df.isnull().sum().sum())
+    
+    for col in df.columns:
+        if df[col].dtype in ['int64', 'float64']:
+            df[col] = df[col].fillna(df[col].median())
+        else:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    stats['missing_values_fixed'] = missing_before
+    
+    date_columns = detect_date_columns(df)
+    for col in date_columns:
+        try:
+            df[col] = pd.to_datetime(df[col])
+        except:
+            pass
+    
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except:
+                pass
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    outliers_count = 0
+    for col in numeric_columns:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = int(df[(df[col] < lower_bound) | (df[col] > upper_bound)].shape[0])
+        outliers_count += outliers
+    stats['outliers_detected'] = outliers_count
+    
+    total_cells = int(stats['original_rows'] * stats['original_columns'])
+    issues = int(stats['duplicates_removed'] + stats['missing_values_fixed'] + stats['outliers_detected'])
+    if total_cells > 0:
+        score = max(0, 100 - (issues / total_cells * 100))
+    else:
+        score = 100
+    stats['data_quality_score'] = float(round(min(100, score), 1))
+    
+    stats = convert_to_native_types(stats)
+    return df, stats
 
-            <!-- Data Preview -->
-            <section class="fade-in">
-                <div class="glass-card p-6">
-                    <h3 class="text-white font-semibold mb-4">📋 Data Preview (First 10 Rows)</h3>
-                    <div class="overflow-x-auto">
-                        <table id="preview-table" class="w-full text-sm">
-                            <!-- Dynamic table content -->
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
+def identify_columns(df):
+    """Identify numeric and categorical columns"""
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+    return numeric_cols, categorical_cols, date_cols
 
-    <script>
-        const uploadZone = document.getElementById('upload-zone');
-        const fileInput = document.getElementById('file-input');
-        const fileInfo = document.getElementById('file-info');
-        const loading = document.getElementById('loading');
-        const dashboard = document.getElementById('dashboard');
-        let selectedFile = null;
-
-        // Upload zone click handler
-        uploadZone.addEventListener('click', () => fileInput.click());
-
-        // Drag and drop handlers
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-
-        uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            handleFile(e.dataTransfer.files[0]);
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFile(e.target.files[0]);
-        });
-
-        function handleFile(file) {
-            if (!file) return;
+def generate_visualizations(df):
+    """Generate interactive Plotly charts with professional styling"""
+    numeric_cols, categorical_cols, date_cols = identify_columns(df)
+    charts = []
+    
+    # Professional color palette
+    colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', 
+              '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4']
+    
+    # Bar Chart
+    if categorical_cols and numeric_cols:
+        try:
+            cat_col = categorical_cols[0]
+            num_col = numeric_cols[0]
+            grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=False).head(10)
             
-            const validTypes = ['.csv', '.xls', '.xlsx'];
-            const extension = '.' + file.name.split('.').pop().toLowerCase();
-            
-            if (!validTypes.includes(extension)) {
-                alert('Please upload a CSV or Excel file');
-                return;
-            }
-            
-            selectedFile = file;
-            document.getElementById('file-name').textContent = file.name;
-            document.getElementById('file-size').textContent = formatFileSize(file.size);
-            fileInfo.classList.remove('hidden');
-            uploadZone.querySelector('p:first-of-type').textContent = 'File selected!';
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / 1048576).toFixed(1) + ' MB';
-        }
-
-        async function processFile() {
-            if (!selectedFile) return;
-            
-            loading.classList.remove('hidden');
-            dashboard.classList.add('hidden');
-            
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                
-                displayResults(data);
-            } catch (error) {
-                alert('Error processing file: ' + error.message);
-            } finally {
-                loading.classList.add('hidden');
-            }
-        }
-
-        function displayResults(data) {
-            // Show dashboard
-            dashboard.classList.remove('hidden');
-            
-            // Scroll to dashboard
-            dashboard.scrollIntoView({ behavior: 'smooth' });
-            
-            // Phase 1: Data Quality
-            const score = data.cleaning_stats.data_quality_score;
-            document.getElementById('quality-score').textContent = score;
-            
-            setTimeout(() => {
-                document.getElementById('quality-bar').style.width = score + '%';
-            }, 100);
-            
-            document.getElementById('total-rows').textContent = data.original_data.rows - data.cleaning_stats.duplicates_removed;
-            document.getElementById('duplicates-removed').textContent = data.cleaning_stats.duplicates_removed;
-            document.getElementById('missing-fixed').textContent = data.cleaning_stats.missing_values_fixed;
-            
-            // Before/After
-            document.getElementById('before-rows').textContent = data.original_data.rows;
-            document.getElementById('before-cols').textContent = data.original_data.columns;
-            document.getElementById('before-missing').textContent = data.original_data.missing;
-            document.getElementById('before-dupes').textContent = data.original_data.duplicates;
-            
-            document.getElementById('after-rows').textContent = data.original_data.rows - data.cleaning_stats.duplicates_removed;
-            document.getElementById('after-cols').textContent = data.cleaned_columns.length;
-            document.getElementById('numeric-cols').textContent = data.numeric_cols;
-            document.getElementById('categorical-cols').textContent = data.categorical_cols;
-            
-            // Phase 2: Visualizations
-            const chartsGrid = document.getElementById('charts-grid');
-            chartsGrid.innerHTML = '';
-            
-            data.charts.forEach((chart, index) => {
-                const chartCard = document.createElement('div');
-                chartCard.className = 'glass-card p-4 chart-container fade-in';
-                chartCard.style.animationDelay = index * 0.2 + 's';
-                
-                const title = document.createElement('h4');
-                title.className = 'text-white font-semibold mb-3';
-                title.textContent = chart.title;
-                
-                const chartDiv = document.createElement('div');
-                chartDiv.id = 'chart-' + chart.id;
-                chartDiv.style.width = '100%';
-                chartDiv.style.height = '100%';
-                
-                chartCard.appendChild(title);
-                chartCard.appendChild(chartDiv);
-                chartsGrid.appendChild(chartCard);
-                
-                setTimeout(() => {
-                    Plotly.newPlot('chart-' + chart.id, chart.chart.data, chart.chart.layout, {
-                        responsive: true,
-                        displayModeBar: false
-                    });
-                }, 100);
-            });
-            
-            // Phase 3: Narrative
-            const insightsGrid = document.getElementById('insights-grid');
-            insightsGrid.innerHTML = '';
-            
-            data.narrative.forEach((insight, index) => {
-                const card = document.createElement('div');
-                card.className = 'glass-card p-6 fade-in';
-                card.style.animationDelay = index * 0.15 + 's';
-                
-                const iconMap = {
-                    'overview': '📊',
-                    'numeric': '📈',
-                    'categorical': '🏷️',
-                    'correlation': '🔗',
-                    'trend': '📅',
-                    'summary': '🎯'
-                };
-                
-                card.innerHTML = `
-                    <h4 class="text-white font-semibold mb-3 flex items-center">
-                        <span class="mr-2">${iconMap[insight.type] || '💡'}</span>
-                        ${insight.title}
-                    </h4>
-                    <p class="text-gray-300 leading-relaxed text-sm">${insight.content}</p>
-                `;
-                
-                insightsGrid.appendChild(card);
-            });
-            
-            // Data Preview Table
-            const previewTable = document.getElementById('preview-table');
-            if (data.preview.length > 0) {
-                const columns = Object.keys(data.preview[0]);
-                let tableHTML = '<thead><tr class="border-b border-gray-700">';
-                columns.forEach(col => {
-                    tableHTML += `<th class="text-left py-2 px-3 text-gray-400 font-semibold">${col}</th>`;
-                });
-                tableHTML += '</tr></thead><tbody>';
-                
-                data.preview.forEach(row => {
-                    tableHTML += '<tr class="border-b border-gray-800 hover:bg-gray-800 transition-colors">';
-                    columns.forEach(col => {
-                        tableHTML += `<td class="py-2 px-3 text-gray-300">${row[col] || '-'}</td>`;
-                    });
-                    tableHTML += '</tr>';
-                });
-                tableHTML += '</tbody>';
-                
-                previewTable.innerHTML = tableHTML;
-            }
-        }
-    </script>
-</body>
-</html>
+            fig = go.Figure(data=[
+                go.Bar(
+                    x=grouped.index.astype(str),
+                    y=grouped.values,
+                    marker_color=colors[:len(grouped)],
+                    marker_line_color='white',
+                    marker_line_width=1,
+                    text=grouped.values.round(2),
+                    textposition='outside',
+                    textfont=dict(size=11, color='#334155')
+                )
+            ])
+            fig.update_layout(
+                title=dict(text=f'Top 10 {cat_col} by {num_col}', font=dict(size=16, color='#1e293b')),
+                template='plotly_white',
+                plot_bgcolor='#faf
