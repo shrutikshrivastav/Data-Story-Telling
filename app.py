@@ -47,24 +47,32 @@ def detect_date_columns(df: pd.DataFrame) -> list[str]:
     date_cols = []
     for col in df.select_dtypes(include="object").columns:
         sample = df[col].dropna().head(100)
-        converted = pd.to_datetime(sample, infer_datetime_format=True, errors="coerce")
-        if converted.notna().mean() > 0.7:
-            date_cols.append(col)
+        if len(sample) > 0:
+            converted = pd.to_datetime(sample, errors="coerce")
+            if converted.notna().mean() > 0.7:
+                date_cols.append(col)
     return date_cols
 
 
 def fix_dtypes(df: pd.DataFrame) -> pd.DataFrame:
     for col in df.select_dtypes(include="object").columns:
         # try numeric
-        converted = pd.to_numeric(df[col].str.replace(r"[,$%]", "", regex=True), errors="coerce")
-        if converted.notna().sum() / max(len(df), 1) > 0.7:
-            df[col] = converted
-            continue
+        try:
+            converted = pd.to_numeric(df[col].astype(str).str.replace(r"[,$%]", "", regex=True), errors="coerce")
+            if converted.notna().sum() / max(len(df), 1) > 0.7:
+                df[col] = converted
+                continue
+        except:
+            pass
+        
         # try bool
-        lower = df[col].str.lower().str.strip()
-        bool_map = {"true": True, "false": False, "yes": True, "no": False, "1": True, "0": False}
-        if lower.isin(bool_map).mean() > 0.9:
-            df[col] = lower.map(bool_map)
+        try:
+            lower = df[col].astype(str).str.lower().str.strip()
+            bool_map = {"true": True, "false": False, "yes": True, "no": False, "1": True, "0": False}
+            if lower.isin(list(bool_map.keys())).mean() > 0.9:
+                df[col] = lower.map(bool_map)
+        except:
+            pass
     return df
 
 
@@ -75,10 +83,13 @@ def detect_outliers(df: pd.DataFrame) -> dict:
         series = df[col].dropna()
         if len(series) < 10:
             continue
-        z = np.abs(stats.zscore(series))
-        n_out = int((z > 3).sum())
-        if n_out > 0:
-            outlier_info[col] = n_out
+        try:
+            z = np.abs(stats.zscore(series))
+            n_out = int((z > 3).sum())
+            if n_out > 0:
+                outlier_info[col] = n_out
+        except:
+            pass
     return outlier_info
 
 
@@ -115,20 +126,34 @@ def clean_data(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     # 5. Detect & convert date columns
     date_cols = detect_date_columns(df)
     for col in date_cols:
-        df[col] = pd.to_datetime(df[col], infer_datetime_format=True, errors="coerce")
+        try:
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+        except:
+            pass
 
     # 6. Handle missing values
     missing_before = int(df.isnull().sum().sum())
+    
+    # Fill numeric columns with median
     for col in df.select_dtypes(include=[np.number]).columns:
         if df[col].isnull().any():
             df[col].fillna(df[col].median(), inplace=True)
-    for col in df.select_dtypes(include=["object", "category"]).columns:
+    
+    # Fill categorical columns with mode
+    for col in df.select_dtypes(include=["object", "category", "bool"]).columns:
         if df[col].isnull().any():
             mode = df[col].mode()
-            df[col].fillna(mode[0] if len(mode) else "Unknown", inplace=True)
+            if len(mode) > 0:
+                df[col].fillna(mode[0], inplace=True)
+            else:
+                df[col].fillna("Unknown", inplace=True)
+    
+    # Fill datetime columns with forward fill
     for col in df.select_dtypes(include=["datetime64"]).columns:
         if df[col].isnull().any():
-            df[col].fillna(method="ffill", inplace=True)
+            df[col].fillna(method='ffill', inplace=True)
+            df[col].fillna(method='bfill', inplace=True)
+    
     missing_after = int(df.isnull().sum().sum())
     missing_fixed = missing_before - missing_after
 
@@ -191,6 +216,8 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
     kpis = []
     for i, col in enumerate(numeric_cols[:6]):
         s = df[col].dropna()
+        if len(s) == 0:
+            continue
         kpis.append({
             "label": col.replace("_", " ").title(),
             "value": _smart_format(s.sum()),
@@ -217,7 +244,7 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                 ),
                 row=r + 1, col=c + 1,
             )
-        fig.update_layout(title_text="📊 Numeric Distributions", **PLOTLY_THEME)
+        fig.update_layout(title_text="📊 Numeric Distributions", height=400)
         _apply_theme(fig)
         charts.append({"type": "chart", "figure": _fig_json(fig), "title": "Numeric Distributions"})
 
@@ -239,7 +266,7 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                 hovertemplate="<b>%{x}</b><br>Count: %{y:,}<extra></extra>",
             )
         )
-        fig.update_layout(title_text=f"📦 {col.replace('_',' ').title()} — Distribution", **PLOTLY_THEME)
+        fig.update_layout(title_text=f"📦 {col.replace('_',' ').title()} — Distribution", height=400)
         _apply_theme(fig)
         charts.append({"type": "chart", "figure": _fig_json(fig), "title": f"{col.replace('_',' ').title()} Distribution"})
 
@@ -258,7 +285,8 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                     textfont=dict(size=12),
                 )
             )
-            fig.update_layout(title_text=f"🥧 {col.replace('_',' ').title()} — Share", **PLOTLY_THEME)
+            fig.update_layout(title_text=f"🥧 {col.replace('_',' ').title()} — Share", height=400)
+            _apply_theme(fig)
             charts.append({"type": "chart", "figure": _fig_json(fig), "title": f"{col.replace('_',' ').title()} Share"})
 
     # ── 4. Time-series line chart ────────────────────
@@ -276,7 +304,8 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                 go.Scatter(
                     x=ts[dcol], y=ts[ncol], mode="lines",
                     line=dict(color=colors[0], width=2.5, shape="spline"),
-                    fill="tozeroy", fillcolor=colors[0].replace(")", ",0.1)").replace("rgb", "rgba") if "rgb" in colors[0] else colors[0] + "1a",
+                    fill="tozeroy", 
+                    fillcolor=f"rgba(99, 102, 241, 0.1)",
                     hovertemplate=f"<b>%{{x|%b %d, %Y}}</b><br>{ncol}: %{{y:,.2f}}<extra></extra>",
                     name=ncol,
                 )
@@ -292,7 +321,7 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                     hovertemplate=f"Avg: %{{y:,.2f}}<extra></extra>",
                 )
             )
-            fig.update_layout(title_text=f"📈 {ncol.replace('_',' ').title()} Over Time", **PLOTLY_THEME)
+            fig.update_layout(title_text=f"📈 {ncol.replace('_',' ').title()} Over Time", height=400)
             _apply_theme(fig)
             charts.append({"type": "chart", "figure": _fig_json(fig), "title": f"{ncol.replace('_',' ').title()} Trend"})
 
@@ -301,7 +330,7 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
         x_col, y_col = numeric_cols[0], numeric_cols[1]
         color_col = categorical_cols[0] if categorical_cols else None
         sample = df.sample(min(500, len(df)), random_state=42)
-        if color_col:
+        if color_col and color_col in sample.columns:
             top_cats = sample[color_col].value_counts().head(8).index
             sample = sample[sample[color_col].isin(top_cats)]
             fig = px.scatter(
@@ -313,7 +342,7 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
         else:
             fig = px.scatter(sample, x=x_col, y=y_col, color_discrete_sequence=[colors[2]], opacity=0.75)
         fig.update_traces(marker=dict(size=7, line=dict(width=0.5, color="rgba(255,255,255,0.3)")))
-        fig.update_layout(title_text=f"🔵 {x_col.replace('_',' ').title()} vs {y_col.replace('_',' ').title()}", **PLOTLY_THEME)
+        fig.update_layout(title_text=f"🔵 {x_col.replace('_',' ').title()} vs {y_col.replace('_',' ').title()}", height=400)
         _apply_theme(fig)
         charts.append({"type": "chart", "figure": _fig_json(fig), "title": f"Scatter: {x_col.title()} vs {y_col.title()}"})
 
@@ -337,7 +366,8 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
                 textfont=dict(size=10),
             )
         )
-        fig.update_layout(title_text="🔥 Correlation Heatmap", **PLOTLY_THEME)
+        fig.update_layout(title_text="🔥 Correlation Heatmap", height=450)
+        _apply_theme(fig)
         charts.append({"type": "chart", "figure": _fig_json(fig), "title": "Correlation Heatmap"})
 
     # ── 7. Category × Numeric grouped bar ───────────
@@ -346,12 +376,13 @@ def generate_visualizations(df: pd.DataFrame, summary: dict) -> list[dict]:
         num1, num2 = numeric_cols[0], numeric_cols[1]
         top_cats = df[cat_col].value_counts().head(10).index
         grouped = df[df[cat_col].isin(top_cats)].groupby(cat_col)[[num1, num2]].mean().reset_index()
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=grouped[cat_col].astype(str), y=grouped[num1], name=num1.replace("_"," ").title(), marker_color=colors[0], opacity=0.9))
-        fig.add_trace(go.Bar(x=grouped[cat_col].astype(str), y=grouped[num2], name=num2.replace("_"," ").title(), marker_color=colors[1], opacity=0.9))
-        fig.update_layout(barmode="group", title_text=f"📊 {cat_col.replace('_',' ').title()} — Comparative Analysis", **PLOTLY_THEME)
-        _apply_theme(fig)
-        charts.append({"type": "chart", "figure": _fig_json(fig), "title": "Comparative Analysis"})
+        if len(grouped) > 0:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=grouped[cat_col].astype(str), y=grouped[num1], name=num1.replace("_"," ").title(), marker_color=colors[0], opacity=0.9))
+            fig.add_trace(go.Bar(x=grouped[cat_col].astype(str), y=grouped[num2], name=num2.replace("_"," ").title(), marker_color=colors[1], opacity=0.9))
+            fig.update_layout(barmode="group", title_text=f"📊 {cat_col.replace('_',' ').title()} — Comparative Analysis", height=400)
+            _apply_theme(fig)
+            charts.append({"type": "chart", "figure": _fig_json(fig), "title": "Comparative Analysis"})
 
     return charts
 
@@ -398,7 +429,10 @@ def generate_narrative(df: pd.DataFrame, summary: dict) -> dict:
         mean_val = s.mean()
         median_val = s.median()
         std_val = s.std()
-        skew = s.skew()
+        try:
+            skew = s.skew()
+        except:
+            skew = 0
         total = s.sum()
         min_val, max_val = s.min(), s.max()
 
@@ -420,20 +454,22 @@ def generate_narrative(df: pd.DataFrame, summary: dict) -> dict:
 
         # Trend (first half vs second half)
         mid = len(s) // 2
-        first_avg = s.iloc[:mid].mean()
-        second_avg = s.iloc[mid:].mean()
-        change_pct = ((second_avg - first_avg) / max(abs(first_avg), 1e-9)) * 100
-        direction = "increased" if change_pct > 5 else "decreased" if change_pct < -5 else "remained stable"
-        if abs(change_pct) > 5:
-            highlights.append({
-                "icon": "📈" if change_pct > 0 else "📉",
-                "label": f"{label} Trend",
-                "value": f"{change_pct:+.1f}%",
-                "color": "#34d399" if change_pct > 0 else "#f87171",
-            })
-            executive_lines.append(
-                f"{label} has {direction} by {abs(change_pct):.1f}% from the first half to the second half of the dataset."
-            )
+        if mid > 0:
+            first_avg = s.iloc[:mid].mean()
+            second_avg = s.iloc[mid:].mean()
+            if abs(first_avg) > 1e-9:
+                change_pct = ((second_avg - first_avg) / abs(first_avg)) * 100
+                direction = "increased" if change_pct > 5 else "decreased" if change_pct < -5 else "remained stable"
+                if abs(change_pct) > 5:
+                    highlights.append({
+                        "icon": "📈" if change_pct > 0 else "📉",
+                        "label": f"{label} Trend",
+                        "value": f"{change_pct:+.1f}%",
+                        "color": "#34d399" if change_pct > 0 else "#f87171",
+                    })
+                    executive_lines.append(
+                        f"{label} has {direction} by {abs(change_pct):.1f}% from the first half to the second half of the dataset."
+                    )
 
     # Categorical insights
     for col in categorical_cols[:3]:
@@ -505,9 +541,13 @@ def generate_narrative(df: pd.DataFrame, summary: dict) -> dict:
             label = ncol.replace("_", " ").title()
             first_val = ts[ncol].iloc[0]
             last_val = ts[ncol].iloc[-1]
-            peak_date = ts.loc[ts[ncol].idxmax(), dcol]
+            peak_idx = ts[ncol].idxmax()
+            peak_date = ts.loc[peak_idx, dcol] if peak_idx in ts.index else ts[dcol].iloc[0]
             peak_val = ts[ncol].max()
-            overall_change = ((last_val - first_val) / max(abs(first_val), 1e-9)) * 100
+            if abs(first_val) > 1e-9:
+                overall_change = ((last_val - first_val) / abs(first_val)) * 100
+            else:
+                overall_change = 0
             insights.append({
                 "icon": "📅",
                 "title": f"{label} Time-Series Analysis",
@@ -522,9 +562,9 @@ def generate_narrative(df: pd.DataFrame, summary: dict) -> dict:
             })
 
     # Outlier commentary
-    if summary.get("outlier_columns"):
-        outlier_cols = list(summary["outlier_columns"].items())
-        cols_str = ", ".join([f"{c.replace('_',' ').title()} ({n})" for c, n in outlier_cols[:4]])
+    if summary.get("outlier_columns") and len(summary["outlier_columns"]) > 0:
+        outlier_cols = list(summary["outlier_columns"].items())[:4]
+        cols_str = ", ".join([f"{c.replace('_',' ').title()} ({n})" for c, n in outlier_cols])
         insights.append({
             "icon": "⚠️",
             "title": "Anomaly Detection",
@@ -577,6 +617,7 @@ def upload():
         fname = f.filename.lower()
         raw = f.read()
 
+        df_raw = None
         if fname.endswith(".csv"):
             for enc in ("utf-8", "latin-1", "cp1252"):
                 try:
@@ -589,7 +630,7 @@ def upload():
         else:
             return jsonify({"error": "Only CSV and Excel files are supported"}), 400
 
-        if df_raw.empty or df_raw.shape[0] < 2:
+        if df_raw is None or df_raw.empty or df_raw.shape[0] < 2:
             return jsonify({"error": "File appears to be empty or has insufficient data"}), 400
 
         # ── Phase 1
