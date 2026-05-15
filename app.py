@@ -135,9 +135,26 @@ def identify_columns(df):
     return numeric_cols, categorical_cols, date_cols
 
 def generate_visualizations(df):
-    """Generate interactive Plotly charts"""
+    """Generate interactive Plotly charts with professional styling"""
     numeric_cols, categorical_cols, date_cols = identify_columns(df)
     charts = []
+    
+    # Professional color palette
+    colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', 
+              '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4']
+    
+    # Common layout settings for professional look
+    common_layout = {
+        'template': 'plotly_white',
+        'paper_bgcolor': 'white',
+        'plot_bgcolor': '#fafbfc',
+        'font': {'family': 'Plus Jakarta Sans, sans-serif', 'color': '#334155', 'size': 12},
+        'margin': {'t': 50, 'l': 60, 'r': 20, 'b': 60},
+        'xaxis': {'gridcolor': '#f1f5f9', 'linecolor': '#e2e8f0', 'showgrid': True},
+        'yaxis': {'gridcolor': '#f1f5f9', 'linecolor': '#e2e8f0', 'showgrid': True},
+        'hovermode': 'x unified',
+        'legend': {'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02, 'xanchor': 'right', 'x': 1}
+    }
     
     # Bar Chart - Top categories
     if categorical_cols and numeric_cols:
@@ -146,19 +163,26 @@ def generate_visualizations(df):
             num_col = numeric_cols[0]
             grouped = df.groupby(cat_col)[num_col].sum().sort_values(ascending=False).head(10)
             
-            fig = px.bar(
-                x=grouped.index.astype(str), 
-                y=grouped.values,
-                title=f'Top 10 {cat_col} by {num_col}',
-                template='plotly_dark',
-                color=grouped.values,
-                color_continuous_scale='viridis'
-            )
-            fig.update_layout(
-                showlegend=False,
-                xaxis_tickangle=-45,
-                margin=dict(t=50, l=50, r=50, b=100)
-            )
+            fig = go.Figure(data=[
+                go.Bar(
+                    x=grouped.index.astype(str),
+                    y=grouped.values,
+                    marker_color=colors[:len(grouped)],
+                    marker_line_color='white',
+                    marker_line_width=1,
+                    text=grouped.values.round(2),
+                    textposition='outside',
+                    textfont=dict(size=11, color='#334155'),
+                    hovertemplate='%{x}<br>%{y:,.2f}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text=f'Top 10 {cat_col.title()} by {num_col.title()}', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout['xaxis']['tickangle'] = -45
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'bar_chart',
                 'title': 'Bar Chart Analysis',
@@ -174,15 +198,25 @@ def generate_visualizations(df):
             num_col = numeric_cols[0]
             df_sorted = df.sort_values(date_col).copy()
             
-            fig = px.line(
-                df_sorted, 
-                x=date_col, 
-                y=num_col,
-                title=f'{num_col} Trend Over Time',
-                template='plotly_dark'
-            )
-            fig.update_traces(line_color='#00ff88', line_width=2)
-            fig.update_layout(margin=dict(t=50, l=50, r=50, b=50))
+            fig = go.Figure(data=[
+                go.Scatter(
+                    x=df_sorted[date_col],
+                    y=df_sorted[num_col],
+                    mode='lines+markers',
+                    line=dict(color='#3b82f6', width=2.5),
+                    marker=dict(size=6, color='#3b82f6'),
+                    fill='tozeroy',
+                    fillcolor='rgba(59, 130, 246, 0.1)',
+                    hovertemplate='%{x}<br>%{y:,.2f}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text=f'{num_col.title()} Trend Over Time', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout['showlegend'] = False
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'line_chart',
                 'title': 'Trend Analysis',
@@ -197,15 +231,26 @@ def generate_visualizations(df):
             cat_col = categorical_cols[0]
             value_counts = df[cat_col].value_counts().head(8)
             
-            fig = px.pie(
-                values=value_counts.values,
-                names=value_counts.index.astype(str),
-                title=f'{cat_col} Distribution',
-                template='plotly_dark',
-                hole=0.3
-            )
-            fig.update_traces(marker=dict(colors=px.colors.sequential.Viridis))
-            fig.update_layout(margin=dict(t=50, l=50, r=50, b=50))
+            fig = go.Figure(data=[
+                go.Pie(
+                    labels=value_counts.index.astype(str),
+                    values=value_counts.values,
+                    hole=0.4,
+                    marker=dict(colors=colors[:len(value_counts)], line=dict(color='white', width=2)),
+                    textinfo='label+percent',
+                    textfont=dict(size=11, color='#334155'),
+                    hovertemplate='%{label}<br>%{value:,.0f} records<br>%{percent}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text=f'{cat_col.title()} Distribution', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout.pop('xaxis', None)
+            layout.pop('yaxis', None)
+            layout.pop('hovermode', None)
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'pie_chart',
                 'title': 'Distribution Analysis',
@@ -218,15 +263,24 @@ def generate_visualizations(df):
     if numeric_cols:
         try:
             num_col = numeric_cols[0]
-            fig = px.histogram(
-                df, 
-                x=num_col, 
-                nbins=30,
-                title=f'{num_col} Distribution',
-                template='plotly_dark',
-                color_discrete_sequence=['#00ff88']
-            )
-            fig.update_layout(margin=dict(t=50, l=50, r=50, b=50))
+            
+            fig = go.Figure(data=[
+                go.Histogram(
+                    x=df[num_col],
+                    nbinsx=30,
+                    marker_color='#3b82f6',
+                    marker_line_color='white',
+                    marker_line_width=1,
+                    hovertemplate='Range: %{x}<br>Count: %{y}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text=f'{num_col.title()} Distribution', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout['showlegend'] = False
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'histogram',
                 'title': 'Histogram Analysis',
@@ -238,16 +292,27 @@ def generate_visualizations(df):
     # Scatter Plot
     if len(numeric_cols) >= 2:
         try:
-            fig = px.scatter(
-                df, 
-                x=numeric_cols[0], 
-                y=numeric_cols[1],
-                title=f'{numeric_cols[0]} vs {numeric_cols[1]}',
-                template='plotly_dark',
-                opacity=0.6
-            )
-            fig.update_traces(marker=dict(color='#00ff88', size=8))
-            fig.update_layout(margin=dict(t=50, l=50, r=50, b=50))
+            fig = go.Figure(data=[
+                go.Scatter(
+                    x=df[numeric_cols[0]],
+                    y=df[numeric_cols[1]],
+                    mode='markers',
+                    marker=dict(
+                        size=8,
+                        color='#3b82f6',
+                        opacity=0.6,
+                        line=dict(color='white', width=1)
+                    ),
+                    hovertemplate=f'{numeric_cols[0]}: %{{x:,.2f}}<br>{numeric_cols[1]}: %{{y:,.2f}}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text=f'{numeric_cols[0].title()} vs {numeric_cols[1].title()}', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout['showlegend'] = False
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'scatter_plot',
                 'title': 'Scatter Analysis',
@@ -261,20 +326,33 @@ def generate_visualizations(df):
         try:
             corr_matrix = df[numeric_cols].corr()
             
-            fig = go.Figure(data=go.Heatmap(
-                z=corr_matrix.values,
-                x=corr_matrix.columns.tolist(),
-                y=corr_matrix.columns.tolist(),
-                colorscale='Viridis',
-                text=np.round(corr_matrix.values, 2),
-                texttemplate='%{text}',
-                textfont={"size": 10}
-            ))
-            fig.update_layout(
-                title='Correlation Heatmap',
-                template='plotly_dark',
-                margin=dict(t=50, l=50, r=50, b=100)
-            )
+            fig = go.Figure(data=[
+                go.Heatmap(
+                    z=corr_matrix.values,
+                    x=corr_matrix.columns.tolist(),
+                    y=corr_matrix.columns.tolist(),
+                    colorscale=[
+                        [0, '#ef4444'],
+                        [0.5, '#f8fafc'],
+                        [1, '#3b82f6']
+                    ],
+                    zmin=-1,
+                    zmax=1,
+                    text=np.round(corr_matrix.values, 2),
+                    texttemplate='%{text}',
+                    textfont={"size": 11, "color": "#1e293b", "family": "Plus Jakarta Sans, sans-serif"},
+                    hoverongaps=False,
+                    hovertemplate='%{x} vs %{y}<br>Correlation: %{z:.2f}<extra></extra>'
+                )
+            ])
+            
+            layout = common_layout.copy()
+            layout['title'] = dict(text='Correlation Heatmap', 
+                                  font=dict(size=16, color='#1e293b', family='Plus Jakarta Sans, sans-serif'))
+            layout['xaxis']['tickangle'] = -45
+            layout['height'] = 500
+            
+            fig.update_layout(layout)
             charts.append({
                 'id': 'heatmap',
                 'title': 'Correlation Analysis',
@@ -300,7 +378,7 @@ def generate_narrative(df, stats):
     # Dataset overview
     insights.append({
         'type': 'overview',
-        'title': '📊 Dataset Overview',
+        'title': 'Dataset Overview',
         'content': f'The dataset contains {original_rows} records across {len(df.columns)} variables, with a data quality score of {quality_score}%. '
                   f'After cleaning, we removed {duplicates_removed} duplicate entries and fixed {missing_fixed} missing values.'
     })
@@ -316,14 +394,14 @@ def generate_narrative(df, stats):
                 min_val = float(df[col].min())
                 
                 trend = "stable"
-                if std_val > mean_val * 0.5 and mean_val != 0:
+                if mean_val != 0 and std_val > mean_val * 0.5:
                     trend = "highly variable"
                 elif mean_val != 0 and std_val < mean_val * 0.1:
                     trend = "consistent"
                 
                 insights.append({
                     'type': 'numeric',
-                    'title': f'📈 {col.title()} Analysis',
+                    'title': f'{col.title()} Analysis',
                     'content': f'The average {col} is {mean_val:.2f} with a standard deviation of {std_val:.2f}, indicating {trend} behavior. '
                               f'Values range from {min_val:.2f} to {max_val:.2f}, with the median at {median_val:.2f}. '
                               f'{"This suggests significant variation in the data." if trend == "highly variable" else "The data shows moderate stability."}'
@@ -345,7 +423,7 @@ def generate_narrative(df, stats):
                 
                 insights.append({
                     'type': 'categorical',
-                    'title': f'🏷️ {cat_col.title()} Breakdown',
+                    'title': f'{cat_col.title()} Breakdown',
                     'content': f'The top category is "{str(top_cat.index[0])}" representing {int(top_cat.values[0])} records ({top_percentage:.1f}% of total). '
                               f'There are {total_cats} unique categories in this field. '
                               f'The top 3 categories account for {top3_percentage:.1f}% of all data.'
@@ -372,7 +450,7 @@ def generate_narrative(df, stats):
                 relationship = "strong positive" if corr_value > 0 else "strong negative"
                 insights.append({
                     'type': 'correlation',
-                    'title': '🔗 Key Relationship Found',
+                    'title': 'Key Relationship Found',
                     'content': f'The strongest correlation exists between {max_pair[0]} and {max_pair[1]} ({corr_value:.2f}), '
                               f'indicating a {relationship} relationship. '
                               f'This suggests that changes in {max_pair[0]} significantly impact {max_pair[1]}.'
@@ -395,7 +473,7 @@ def generate_narrative(df, stats):
                     growth = float(((last_quarter - first_quarter) / first_quarter) * 100)
                     insights.append({
                         'type': 'trend',
-                        'title': '📅 Growth Trend Detected',
+                        'title': 'Growth Trend Detected',
                         'content': f'Comparing the first and last quarters, {num_col} shows a growth of {growth:.1f}%. '
                                   f'The average increased from {first_quarter:.2f} to {last_quarter:.2f}. '
                                   f'This upward trajectory suggests positive momentum in the business.'
@@ -404,7 +482,7 @@ def generate_narrative(df, stats):
                     decline = float(((first_quarter - last_quarter) / first_quarter) * 100)
                     insights.append({
                         'type': 'trend',
-                        'title': '📉 Decline Pattern Observed',
+                        'title': 'Decline Pattern Observed',
                         'content': f'There is a concerning decline of {decline:.1f}% in {num_col} from {first_quarter:.2f} to {last_quarter:.2f}. '
                                   f'This requires immediate attention and further investigation.'
                     })
@@ -420,7 +498,7 @@ def generate_narrative(df, stats):
     
     insights.append({
         'type': 'summary',
-        'title': '🎯 Key Takeaways',
+        'title': 'Key Takeaways',
         'content': f'The data reveals that {primary_cat} is the main driver of {primary_num}. '
                   f'With a quality score of {quality_score}%, the dataset is {quality_description}. '
                   f'{outlier_message}'
