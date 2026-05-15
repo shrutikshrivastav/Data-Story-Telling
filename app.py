@@ -1,263 +1,390 @@
 import os
-import uuid
 import json
+from flask import Flask, render_template, request, jsonify
+from werkzeug.utils import secure_filename
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import plotly.graph_objects as go
-import google.generativeai as genai
-from flask import Flask, request, jsonify, render_template, send_file, session
-from werkzeug.utils import secure_filename
-import traceback
+import plotly.express as px
+from plotly.subplots import make_subplots
+from datetime import datetime
+import io
+from scipy import stats
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-prod')
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['CLEANED_FOLDER'] = 'cleaned'
-app.config['CHARTS_FOLDER'] = 'charts'
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'supersecretkey123')
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
 
-# Create runtime folders
+# Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['CLEANED_FOLDER'], exist_ok=True)
-os.makedirs(app.config['CHARTS_FOLDER'], exist_ok=True)
 
-# Configure Gemini API
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-pro')
-else:
-    gemini_model = None
-    print("WARNING: GEMINI_API_KEY not set. AI features disabled.")
+# ==================== DATA CLEANING & PROCESSING ====================
 
-# ------------------------- Data Cleaning -------------------------
-def normalize_column_names(df):
-    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
-    df.columns = df.columns.str.replace(r'[^a-z0-9_]', '', regex=True)
-    return df
+def clean_data(df):
+    """Comprehensive data cleaning with quality metrics"""
+    
+    initial_shape = df.shape
+    metrics = {
+        'initial_rows': initial_shape[0],
+        'initial_columns': initial_shape[1],
+        'duplicates_removed': 0,
+        'missing_values_fixed': 0,
+        'outliers_detected': 0,
+        'rows_removed': 0,
+        'missing_cells': df.isnull().sum().sum(),
+    }
+    
+    df_clean = df.copy()
+    
+    # Remove completely empty rows
+    empty_rows = df_clean.isnull().all(axis=1).sum()
+    df_clean = df_clean.dropna(how='all')
+    metrics['rows_removed'] += empty_rows
+    
+    # Remove duplicate rows
+    duplicates = df_clean.duplicated().sum()
+    df_clean = df_clean.drop_duplicates()
+    metrics['duplicates_removed'] = duplicates
+    
+    # Handle missing values
+    for col in df_clean.columns:
+        if df_clean[col].dtype in ['float64', 'int64']:
+            missing_count = df_clean[col].isnull().sum()
+            if missing_count > 0:
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+                metrics['missing_values_fixed'] += missing_count
+        else:
+            missing_count = df_clean[col].isnull().sum()
+            if missing_count > 0:
+                df_clean[col].fillna('Unknown', inplace=True)
+                metrics['missing_values_fixed'] += missing_count
+    
+    # Normalize column names
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_').str.replace('[^a-z0-9_]', '', regex=True)
+    
+    # Detect and handle data types
+    type_mapping = {}
+    for col in df_clean.columns:
+        try:
+            # Try to detect date columns
+            if 'date' in col or 'time' in col:
+                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+                type_mapping[col] = 'datetime'
+            # Try to convert to numeric
+            elif df_clean[col].dtype == 'object':
+                numeric_test = pd.to_numeric(df_clean[col], errors='coerce')
+                if numeric_test.notna().sum() / len(df_clean) > 0.8:
+                    df_clean[col] = numeric_test
+                    type_mapping[col] = 'numeric'
+                else:
+                    type_mapping[col] = 'categorical'
+            else:
+                type_mapping[col] = 'numeric' if pd.api.types.is_numeric_dtype(df_clean[col]) else 'categorical'
+        except:
+            type_mapping[col] = 'categorical'
+    
+    metrics['type_mapping'] = type_mapping
+    metrics['final_rows'] = len(df_clean)
+    metrics['final_columns'] = len(df_clean.columns)
+    
+    return df_clean, metrics
 
-def detect_and_convert_dates(df):
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            try:
-                converted = pd.to_datetime(df[col], errors='ignore')
-                if converted.dtype == 'datetime64[ns]':
-                    df[col] = converted
-            except:
-                pass
-    return df
-
-def handle_outliers(df, threshold=3):
+def detect_outliers(df):
+    """Detect outliers using IQR method"""
+    outlier_info = {}
     numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
     for col in numeric_cols:
         Q1 = df[col].quantile(0.25)
         Q3 = df[col].quantile(0.75)
         IQR = Q3 - Q1
-        lower = Q1 - threshold * IQR
-        upper = Q3 + threshold * IQR
-        df[col] = df[col].clip(lower, upper)
-    return df
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)][col]
+        
+        if len(outliers) > 0:
+            outlier_info[col] = {
+                'count': len(outliers),
+                'percentage': round((len(outliers) / len(df)) * 100, 2),
+                'bounds': {
+                    'lower': round(lower_bound, 2),
+                    'upper': round(upper_bound, 2)
+                }
+            }
+    
+    return outlier_info
 
-def clean_data(df):
-    df = df.drop_duplicates()
-    df = normalize_column_names(df)
-    df = df.dropna(how='all')
-    df = df.dropna(axis=1, how='all')
-    df = detect_and_convert_dates(df)
+def calculate_quality_score(df, metrics, outliers):
+    """Calculate overall dataset quality score"""
+    score = 100
     
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    # Penalty for missing values
+    if metrics['missing_values_fixed'] > 0:
+        missing_ratio = (metrics['missing_values_fixed'] / (df.shape[0] * df.shape[1])) * 100
+        score -= min(missing_ratio * 0.1, 15)
     
-    for col in numeric_cols:
-        if df[col].isnull().any():
-            df[col].fillna(df[col].median(), inplace=True)
-    for col in categorical_cols:
-        if df[col].isnull().any():
-            df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+    # Penalty for duplicates
+    if metrics['duplicates_removed'] > 0:
+        dup_ratio = (metrics['duplicates_removed'] / metrics['initial_rows']) * 100
+        score -= min(dup_ratio * 0.1, 10)
     
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            try:
-                df[col] = pd.to_numeric(df[col])
-            except:
-                pass
+    # Penalty for outliers
+    total_outliers = sum(v['count'] for v in outliers.values())
+    if total_outliers > 0:
+        outlier_ratio = (total_outliers / (df.shape[0] * len(df.select_dtypes(include=[np.number]).columns))) * 100
+        score -= min(outlier_ratio * 0.05, 10)
     
-    df = handle_outliers(df)
-    return df
+    return max(score, 10)
 
-# ------------------------- EDA & Charts -------------------------
-def generate_eda_report(df):
-    total_rows = len(df)
-    total_cols = len(df.columns)
-    missing_values = df.isnull().sum().sum()
-    duplicates = df.duplicated().sum()
+# ==================== VISUALIZATION GENERATION ====================
+
+def generate_visualizations(df):
+    """Generate comprehensive visualizations"""
+    visualizations = {}
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
-    missing_per_col = df.isnull().sum().to_dict()
-    numeric_stats = {}
-    for col in numeric_cols:
-        numeric_stats[col] = {
-            'mean': float(df[col].mean()) if not pd.isna(df[col].mean()) else 0,
-            'median': float(df[col].median()) if not pd.isna(df[col].median()) else 0,
-            'std': float(df[col].std()) if not pd.isna(df[col].std()) else 0,
-            'min': float(df[col].min()) if not pd.isna(df[col].min()) else 0,
-            'max': float(df[col].max()) if not pd.isna(df[col].max()) else 0
-        }
-    return {
-        'total_rows': total_rows, 'total_cols': total_cols,
-        'missing_values': missing_values, 'duplicates': duplicates,
-        'numeric_cols': numeric_cols, 'categorical_cols': categorical_cols,
-        'date_cols': date_cols, 'missing_per_col': missing_per_col,
-        'numeric_stats': numeric_stats
-    }
-
-def generate_correlation_heatmap(df):
-    numeric_df = df.select_dtypes(include=[np.number])
-    if len(numeric_df.columns) >= 2:
-        corr = numeric_df.corr()
+    datetime_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
+    
+    # 1. Numeric Distribution (Histogram)
+    if len(numeric_cols) > 0:
+        primary_numeric = numeric_cols[0]
+        fig = px.histogram(
+            df,
+            x=primary_numeric,
+            nbins=30,
+            title=f"Distribution: {primary_numeric.replace('_', ' ').title()}",
+            labels={primary_numeric: primary_numeric.replace('_', ' ').title(), 'count': 'Frequency'},
+            color_discrete_sequence=['#00d9ff']
+        )
+        fig.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(30,30,50,0.3)',
+            font=dict(family='Segoe UI, sans-serif', size=12, color='#e0e0e0'),
+            hovermode='x unified',
+            showlegend=False,
+            margin=dict(l=40, r=40, t=50, b=40)
+        )
+        visualizations['distribution'] = fig.to_html(include_plotlyjs=False, div_id='dist-chart')
+    
+    # 2. Top Categories (Bar Chart)
+    if len(categorical_cols) > 0:
+        primary_cat = categorical_cols[0]
+        top_cats = df[primary_cat].value_counts().head(10)
+        fig = go.Figure(data=[
+            go.Bar(
+                x=top_cats.values,
+                y=top_cats.index,
+                orientation='h',
+                marker=dict(
+                    color=top_cats.values,
+                    colorscale='Viridis',
+                    line=dict(color='rgba(0, 217, 255, 0.5)', width=1)
+                ),
+                text=top_cats.values,
+                textposition='outside',
+                hovertemplate='%{y}<br>Count: %{x}<extra></extra>'
+            )
+        ])
+        fig.update_layout(
+            title=f"Top Categories: {primary_cat.replace('_', ' ').title()}",
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(30,30,50,0.3)',
+            font=dict(family='Segoe UI, sans-serif', size=12, color='#e0e0e0'),
+            showlegend=False,
+            margin=dict(l=150, r=40, t=50, b=40),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)')
+        )
+        visualizations['categories'] = fig.to_html(include_plotlyjs=False, div_id='cat-chart')
+    
+    # 3. Correlation Heatmap
+    if len(numeric_cols) > 1:
+        corr_matrix = df[numeric_cols].corr()
         fig = go.Figure(data=go.Heatmap(
-            z=corr.values, x=corr.columns, y=corr.columns,
-            colorscale='RdBu', zmin=-1, zmax=1,
-            text=corr.round(2).values, texttemplate='%{text}', textfont={"size": 10}
+            z=corr_matrix.values,
+            x=corr_matrix.columns,
+            y=corr_matrix.columns,
+            colorscale='RdBu',
+            zmid=0,
+            text=np.round(corr_matrix.values, 2),
+            texttemplate='%{text:.2f}',
+            textfont={"size": 10},
+            colorbar=dict(thickness=15, len=0.7)
         ))
-        fig.update_layout(title='Correlation Heatmap', height=500, template='plotly_dark')
-        return fig
-    return None
-
-def generate_histograms(df):
-    figs = []
-    for col in df.select_dtypes(include=[np.number]).columns[:3]:
-        fig = px.histogram(df, x=col, title=f'Distribution of {col}', nbins=30, template='plotly_dark')
-        figs.append(fig)
-    return figs
-
-def generate_bar_chart(df):
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
-    if len(cat_cols) > 0:
-        col = cat_cols[0]
-        counts = df[col].value_counts().head(10)
-        fig = px.bar(x=counts.index, y=counts.values, title=f'Top 10 in {col}', template='plotly_dark')
-        fig.update_layout(xaxis_title=col, yaxis_title='Count')
-        return fig
-    return None
-
-def generate_pie_chart(df):
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns
-    if len(cat_cols) > 0:
-        col = cat_cols[0]
-        counts = df[col].value_counts().head(5)
-        fig = px.pie(values=counts.values, names=counts.index, title=f'{col} Distribution', template='plotly_dark')
-        return fig
-    return None
-
-def generate_line_chart(df):
-    date_cols = df.select_dtypes(include=['datetime64']).columns
-    num_cols = df.select_dtypes(include=[np.number]).columns
-    if len(date_cols) > 0 and len(num_cols) > 0:
-        df_sorted = df.sort_values(date_cols[0])
-        fig = px.line(df_sorted, x=date_cols[0], y=num_cols[0],
-                      title=f'Trend: {num_cols[0]} over {date_cols[0]}', template='plotly_dark')
-        return fig
-    return None
-
-def generate_scatter_plot(df):
-    num_cols = df.select_dtypes(include=[np.number]).columns
-    if len(num_cols) >= 2:
-        fig = px.scatter(df, x=num_cols[0], y=num_cols[1],
-                         title=f'{num_cols[0]} vs {num_cols[1]}', template='plotly_dark')
-        return fig
-    return None
-
-def generate_all_charts(df):
-    charts = []
-    uid = str(uuid.uuid4())[:8]
+        fig.update_layout(
+            title="Correlation Matrix",
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(30,30,50,0.3)',
+            font=dict(family='Segoe UI, sans-serif', size=11, color='#e0e0e0'),
+            margin=dict(l=100, r=40, t=50, b=100)
+        )
+        visualizations['correlation'] = fig.to_html(include_plotlyjs=False, div_id='corr-chart')
     
-    # Heatmap
-    fig = generate_correlation_heatmap(df)
-    if fig:
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'heatmap_{uid}.html')
-        fig.write_html(path)
-        charts.append(('Correlation Heatmap', fig.to_json(), path))
+    # 4. Numeric Scatter (if multiple numeric columns)
+    if len(numeric_cols) >= 2:
+        fig = px.scatter(
+            df,
+            x=numeric_cols[0],
+            y=numeric_cols[1],
+            title=f"{numeric_cols[0].replace('_', ' ').title()} vs {numeric_cols[1].replace('_', ' ').title()}",
+            color_discrete_sequence=['#00d9ff']
+        )
+        fig.update_traces(marker=dict(size=6, opacity=0.6, line=dict(width=0.5, color='rgba(0, 217, 255, 0.8)')))
+        fig.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(30,30,50,0.3)',
+            font=dict(family='Segoe UI, sans-serif', size=12, color='#e0e0e0'),
+            hovermode='closest',
+            showlegend=False,
+            margin=dict(l=40, r=40, t=50, b=40)
+        )
+        visualizations['scatter'] = fig.to_html(include_plotlyjs=False, div_id='scatter-chart')
     
-    # Histograms
-    for i, fig in enumerate(generate_histograms(df)):
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'hist_{i}_{uid}.html')
-        fig.write_html(path)
-        charts.append((f'Histogram {i+1}', fig.to_json(), path))
+    # 5. Summary Statistics
+    if len(numeric_cols) > 0:
+        summary_stats = []
+        for col in numeric_cols[:5]:  # Limit to first 5 for performance
+            summary_stats.append({
+                'column': col.replace('_', ' ').title(),
+                'mean': round(df[col].mean(), 2),
+                'median': round(df[col].median(), 2),
+                'std': round(df[col].std(), 2),
+                'min': round(df[col].min(), 2),
+                'max': round(df[col].max(), 2)
+            })
+        visualizations['summary_stats'] = summary_stats
     
-    # Bar chart
-    fig = generate_bar_chart(df)
-    if fig:
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'barchart_{uid}.html')
-        fig.write_html(path)
-        charts.append(('Bar Chart', fig.to_json(), path))
-    
-    # Pie chart
-    fig = generate_pie_chart(df)
-    if fig:
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'pie_{uid}.html')
-        fig.write_html(path)
-        charts.append(('Pie Chart', fig.to_json(), path))
-    
-    # Line chart
-    fig = generate_line_chart(df)
-    if fig:
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'line_{uid}.html')
-        fig.write_html(path)
-        charts.append(('Time Series Trend', fig.to_json(), path))
-    
-    # Scatter plot
-    fig = generate_scatter_plot(df)
-    if fig:
-        path = os.path.join(app.config['CHARTS_FOLDER'], f'scatter_{uid}.html')
-        fig.write_html(path)
-        charts.append(('Scatter Plot', fig.to_json(), path))
-    
-    return charts
+    return visualizations
 
-# ------------------------- AI Insights -------------------------
-def generate_insights(df):
-    if not gemini_model:
-        return "⚠️ Gemini API key missing. Please add GEMINI_API_KEY environment variable to enable AI insights."
+# ==================== NARRATIVE GENERATION ====================
+
+def generate_narrative(df, metrics, visualizations):
+    """Generate professional business insights and narrative"""
     
-    eda = generate_eda_report(df)
-    context = f"""
-Dataset Summary:
-- {eda['total_rows']} rows, {eda['total_cols']} columns
-- Numeric columns: {', '.join(eda['numeric_cols'][:5])}
-- Categorical columns: {', '.join(eda['categorical_cols'][:5])}
-- Date columns: {', '.join(eda['date_cols'])}
-- Missing values: {eda['missing_values']}
-"""
-    prompt = f"""As a senior business analyst, provide 3-4 paragraphs of professional insights, trends, and actionable recommendations based on this dataset.
-
-{context}
-
-Focus on: key patterns, business opportunities, potential risks, and strategic recommendations.
-
-Insights:"""
-    try:
-        response = gemini_model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"AI Error: {str(e)}. Please check your API key."
-
-def answer_question(df, question):
-    if not gemini_model:
-        return "AI features disabled. Please configure GEMINI_API_KEY."
+    narrative = {
+        'executive_summary': '',
+        'data_quality': '',
+        'key_insights': [],
+        'trends': [],
+        'recommendations': []
+    }
     
-    context = f"Dataset has {len(df)} rows and columns: {', '.join(list(df.columns)[:10])}"
-    prompt = f"Based on the dataset with {context}, answer: {question}\nAnswer concisely:"
-    try:
-        response = gemini_model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error: {str(e)}"
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    # Executive Summary
+    narrative['executive_summary'] = (
+        f"Dataset Analysis Report: {metrics['final_rows']:,} records across {metrics['final_columns']} dimensions. "
+        f"After comprehensive data cleansing, the dataset demonstrates strong quality with consolidated structure "
+        f"ready for analysis and strategic decision-making."
+    )
+    
+    # Data Quality Narrative
+    if metrics['duplicates_removed'] > 0:
+        narrative['data_quality'] += f"• Removed {metrics['duplicates_removed']} duplicate records to ensure data integrity\n"
+    if metrics['missing_values_fixed'] > 0:
+        narrative['data_quality'] += f"• Resolved {metrics['missing_values_fixed']} missing values using statistical imputation\n"
+    narrative['data_quality'] += f"• Standardized {metrics['final_columns']} column names for consistency\n"
+    narrative['data_quality'] += f"• Detected and classified {len(df.select_dtypes(include=[np.number]).columns)} numeric and {len(categorical_cols)} categorical variables\n"
+    
+    if not narrative['data_quality']:
+        narrative['data_quality'] = "• Dataset integrity verified with minimal data quality issues\n• All records validated and standardized\n"
+    
+    # Key Insights from Numeric Data
+    if len(numeric_cols) > 0:
+        for col in numeric_cols[:3]:
+            mean_val = df[col].mean()
+            max_val = df[col].max()
+            min_val = df[col].min()
+            std_val = df[col].std()
+            
+            col_name = col.replace('_', ' ').title()
+            
+            if std_val > 0:
+                cv = (std_val / mean_val) * 100 if mean_val != 0 else 0
+                if cv > 50:
+                    variability = "demonstrates high variability"
+                elif cv > 25:
+                    variability = "shows moderate variation"
+                else:
+                    variability = "remains relatively stable"
+            else:
+                variability = "remains constant"
+            
+            insight = (
+                f"{col_name} {variability}, ranging from {min_val:.2f} to {max_val:.2f} "
+                f"with an average of {mean_val:.2f}"
+            )
+            narrative['key_insights'].append(insight)
+    
+    # Category Insights
+    if len(categorical_cols) > 0:
+        for col in categorical_cols[:2]:
+            top_cat = df[col].value_counts().idxmax()
+            top_count = df[col].value_counts().max()
+            top_pct = (top_count / len(df)) * 100
+            
+            col_name = col.replace('_', ' ').title()
+            narrative['key_insights'].append(
+                f"{col_name} distribution is led by '{top_cat}' category, "
+                f"representing {top_pct:.1f}% of all records"
+            )
+    
+    # Trend Analysis
+    if len(numeric_cols) >= 2:
+        corr_matrix = df[numeric_cols].corr()
+        strong_corr = []
+        for i in range(len(corr_matrix.columns)):
+            for j in range(i+1, len(corr_matrix.columns)):
+                corr_val = corr_matrix.iloc[i, j]
+                if abs(corr_val) > 0.7:
+                    col1 = corr_matrix.columns[i].replace('_', ' ').title()
+                    col2 = corr_matrix.columns[j].replace('_', ' ').title()
+                    direction = "strongly positive" if corr_val > 0 else "strong inverse"
+                    strong_corr.append(
+                        f"{col1} and {col2} exhibit a {direction} relationship ({abs(corr_val):.2f})"
+                    )
+        
+        if strong_corr:
+            narrative['trends'].extend(strong_corr)
+    
+    # Statistical Insights
+    if len(numeric_cols) > 0:
+        for col in numeric_cols[:2]:
+            skewness = stats.skew(df[col].dropna())
+            if abs(skewness) > 1:
+                skew_type = "right-skewed" if skewness > 0 else "left-skewed"
+                narrative['trends'].append(
+                    f"{col.replace('_', ' ').title()} distribution is {skew_type}, "
+                    f"indicating potential outliers or concentration in specific ranges"
+                )
+    
+    # Recommendations
+    if len(numeric_cols) > 0:
+        top_col = df[numeric_cols[0]]
+        percentile_75 = top_col.quantile(0.75)
+        percentile_25 = top_col.quantile(0.25)
+        
+        narrative['recommendations'].append(
+            f"Focus optimization efforts on the upper quartile of "
+            f"{numeric_cols[0].replace('_', ' ').title()} "
+            f"(values above {percentile_75:.2f}) for maximum impact"
+        )
+    
+    narrative['recommendations'].append(
+        "Continue monitoring data quality metrics and implement regular validation cycles"
+    )
+    narrative['recommendations'].append(
+        "Leverage identified correlations to develop predictive models for strategic planning"
+    )
+    
+    return narrative
 
-# ------------------------- Flask Routes -------------------------
+# ==================== FLASK ROUTES ====================
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -265,6 +392,7 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
+        # Check if file is in request
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
@@ -272,122 +400,83 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        ext = file.filename.split('.')[-1].lower()
-        if ext not in ['csv', 'xlsx', 'xls']:
-            return jsonify({'error': 'Invalid file type. Please upload CSV or Excel file'}), 400
+        # Validate file type
+        if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+            return jsonify({'error': 'Only CSV and Excel files are supported'}), 400
         
-        uid = str(uuid.uuid4())[:8]
-        filename = secure_filename(f"{uid}_{file.filename}")
+        filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
         
+        # ==================== PHASE 1: DATA CLEANING ====================
+        
         # Read file
-        try:
-            if ext in ['xlsx', 'xls']:
-                df = pd.read_excel(filepath)
-            else:
-                df = pd.read_csv(filepath, encoding='utf-8')
-        except Exception as e:
-            return jsonify({'error': f'Error reading file: {str(e)}'}), 400
+        if filename.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        else:
+            df = pd.read_excel(filepath)
+        
+        # Store original data
+        original_shape = df.shape
+        original_sample = df.head(3).to_dict('records')
         
         # Clean data
-        cleaned_df = clean_data(df)
-        cleaned_path = os.path.join(app.config['CLEANED_FOLDER'], f'{uid}_cleaned.csv')
-        cleaned_df.to_csv(cleaned_path, index=False)
+        df_clean, metrics = clean_data(df)
         
-        session['cleaned_file'] = cleaned_path
-        session['data_id'] = uid
+        # Detect outliers
+        outliers = detect_outliers(df_clean)
+        metrics['outliers'] = outliers
         
-        # Generate all outputs
-        eda = generate_eda_report(cleaned_df)
-        charts = generate_all_charts(cleaned_df)
-        insights = generate_insights(cleaned_df)
-        session['insights'] = insights
+        # Calculate quality score
+        quality_score = calculate_quality_score(df_clean, metrics, outliers)
+        metrics['quality_score'] = quality_score
         
-        # Prepare preview (convert to serializable format)
-        preview = cleaned_df.head(100).fillna('').to_dict(orient='records')
-        columns = list(cleaned_df.columns)
+        # Cleaned data sample
+        cleaned_sample = df_clean.head(3).to_dict('records')
         
-        # Prepare chart data for frontend
-        chart_data = []
-        for title, json_str, file_path in charts:
-            chart_data.append({
-                'title': title,
-                'json': json_str,
-                'file': os.path.basename(file_path)
-            })
+        # ==================== PHASE 2: VISUALIZATIONS ====================
         
-        kpis = {
-            'total_rows': eda['total_rows'],
-            'total_cols': eda['total_cols'],
-            'missing_values': int(eda['missing_values']),
-            'duplicates': int(eda['duplicates']),
-            'numeric_cols_count': len(eda['numeric_cols'])
+        visualizations = generate_visualizations(df_clean)
+        
+        # ==================== PHASE 3: NARRATIVE ====================
+        
+        narrative = generate_narrative(df_clean, metrics, visualizations)
+        
+        # Prepare response
+        response = {
+            'success': True,
+            'phase1': {
+                'before': {
+                    'rows': original_shape[0],
+                    'columns': original_shape[1],
+                    'sample': original_sample
+                },
+                'after': {
+                    'rows': metrics['final_rows'],
+                    'columns': metrics['final_columns'],
+                    'sample': cleaned_sample
+                },
+                'metrics': {
+                    'duplicates_removed': metrics['duplicates_removed'],
+                    'missing_values_fixed': metrics['missing_values_fixed'],
+                    'outliers_detected': len(outliers),
+                    'rows_removed': metrics['rows_removed'],
+                    'quality_score': round(quality_score, 1)
+                },
+                'outliers_detail': outliers
+            },
+            'phase2': visualizations,
+            'phase3': narrative
         }
         
-        return jsonify({
-            'success': True,
-            'kpis': kpis,
-            'preview': preview,
-            'columns': columns,
-            'charts': chart_data,
-            'insights': insights,
-            'data_id': uid
-        })
+        # Cleanup
+        os.remove(filepath)
         
-    except Exception as e:
-        print(f"Upload error: {traceback.format_exc()}")
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
-
-@app.route('/ask', methods=['POST'])
-def ask():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'Invalid request'}), 400
-            
-        question = data.get('question', '')
-        if not question:
-            return jsonify({'error': 'No question provided'}), 400
-        
-        cleaned_file = session.get('cleaned_file')
-        if not cleaned_file or not os.path.exists(cleaned_file):
-            return jsonify({'error': 'No dataset loaded. Please upload a file first.'}), 400
-        
-        df = pd.read_csv(cleaned_file)
-        answer = answer_question(df, question)
-        return jsonify({'answer': answer})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/download-cleaned')
-def download_cleaned():
-    cleaned_file = session.get('cleaned_file')
-    if not cleaned_file or not os.path.exists(cleaned_file):
-        return "No cleaned file available. Please upload a dataset first.", 404
-    return send_file(cleaned_file, as_attachment=True, download_name='cleaned_data.csv')
-
-@app.route('/download-insights')
-def download_insights():
-    insights = session.get('insights', '')
-    if not insights:
-        return "No insights available. Please upload a dataset first.", 404
+        return jsonify(response)
     
-    from io import BytesIO
-    output = BytesIO()
-    output.write(insights.encode('utf-8'))
-    output.seek(0)
-    return send_file(output, as_attachment=True, download_name='ai_insights.txt', mimetype='text/plain')
-
-@app.route('/download-chart/<filename>')
-def download_chart(filename):
-    safe_path = os.path.join(app.config['CHARTS_FOLDER'], filename)
-    if os.path.exists(safe_path):
-        return send_file(safe_path, as_attachment=True, download_name=filename)
-    return "Chart not found", 404
+    except Exception as e:
+        return jsonify({'error': f'Processing error: {str(e)}'}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-
+    app.run(debug=False, host='0.0.0.0', port=port)
