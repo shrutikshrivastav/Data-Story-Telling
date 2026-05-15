@@ -1,227 +1,158 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enterprise Analytics Workspace</title>
+    <title>DataStory | Intelligent Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        brand: { 50: '#eff6ff', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
-                        surface: '#1e293b',
-                        background: '#0f172a'
-                    }
-                }
-            }
-        }
-    </script>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; }
-        .card {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 0.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-        }
-        .section-title { font-size: 1.125rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
-        /* Professional Progress Bar */
-        .progress-bar { width: 100%; height: 4px; background-color: #334155; border-radius: 2px; overflow: hidden; }
-        .progress-value { width: 30%; height: 100%; background-color: #3b82f6; animation: progress 2s infinite ease-in-out; }
-        @keyframes progress { 0% { width: 0%; margin-left: 0; } 50% { width: 30%; margin-left: 70%; } 100% { width: 0%; margin-left: 100%; } }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        body { background: #020617; font-family: 'Inter', sans-serif; color: #e2e8f0; }
+        .tab-active { color: #38bdf8; border-bottom: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.05); }
+        .glass-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; }
+        .custom-table th { background: #1e293b; color: #38bdf8; position: sticky; top: 0; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
+        .custom-table td { padding: 10px 12px; border-bottom: 1px solid #1e293b; font-size: 13px; color: #94a3b8; }
+        .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; }
     </style>
 </head>
-<body class="antialiased overflow-x-hidden selection:bg-brand-500 selection:text-white">
+<body class="min-h-screen">
 
-    <nav class="bg-surface border-b border-slate-700 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
-        <div class="flex items-center gap-3">
-            <i class="fas fa-chart-pie text-brand-500 text-xl"></i>
-            <h1 class="text-lg font-bold tracking-tight text-white">Enterprise BI</h1>
+    <header class="border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-cube text-white"></i></div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">DataStory</h1>
+                    <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Intelligent Analytics</p>
+                </div>
+            </div>
+
+            <div id="nav-tabs" class="hidden flex gap-8 h-full items-center">
+                <button onclick="switchTab('data')" id="tab-data" class="h-full px-4 text-sm font-medium transition-all tab-active"><i class="fas fa-table mr-2"></i>Data</button>
+                <button onclick="switchTab('viz')" id="tab-viz" class="h-full px-4 text-sm font-medium transition-all text-slate-400"><i class="fas fa-chart-bar mr-2"></i>Visualizations</button>
+                <button onclick="switchTab('nar')" id="tab-nar" class="h-full px-4 text-sm font-medium transition-all text-slate-400"><i class="fas fa-magic mr-2"></i>Narrative</button>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
+                    <div class="status-dot"></div>
+                    <span class="text-[11px] font-bold text-green-500 uppercase">System Online</span>
+                </div>
+                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-all">
+                    <i class="fas fa-plus mr-2"></i> New File
+                </button>
+            </div>
         </div>
-        <div class="text-xs font-semibold px-2 py-1 bg-slate-700 rounded text-slate-300 uppercase tracking-wider">Workspace</div>
-    </nav>
+    </header>
 
-    <main class="container mx-auto px-4 py-8 max-w-[1400px]">
+    <main class="max-w-[1600px] mx-auto p-6">
         
-        <div id="upload-section" class="max-w-3xl mx-auto mt-16">
-            <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold text-white mb-2">Data Ingestion Engine</h2>
-                <p class="text-slate-400">Securely upload datasets for automated processing and visualization.</p>
-            </div>
-            
-            <div id="drop-zone" class="card border-dashed border-2 border-slate-500 hover:border-brand-500 hover:bg-slate-800/50 p-16 text-center cursor-pointer relative transition-colors">
-                <input type="file" id="file-input" accept=".csv, .xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
-                <i class="fas fa-file-csv text-5xl text-slate-400 mb-4"></i>
-                <h3 class="text-xl font-semibold text-white mb-1">Click or drag file to upload</h3>
-                <p class="text-sm text-slate-400">Supported formats: CSV, Excel (Up to 50MB)</p>
-            </div>
-
-            <div id="loading-state" class="hidden flex-col items-center justify-center mt-12 space-y-4">
-                <div class="text-slate-300 font-medium text-lg" id="loading-text">Processing dataset...</div>
-                <div class="progress-bar max-w-md"><div class="progress-value"></div></div>
-            </div>
+        <div id="upload-container" class="mt-20 max-w-xl mx-auto text-center">
+            <h2 class="text-3xl font-bold mb-4">Start your Data Journey</h2>
+            <p class="text-slate-400 mb-8 text-sm">Upload your dataset to generate automated insights and interactive dashboards.</p>
+            <label class="glass-card flex flex-col items-center justify-center p-20 border-dashed border-2 border-slate-700 cursor-pointer hover:border-blue-500 transition-all group">
+                <input type="file" class="hidden" onchange="handleUpload(this)">
+                <i class="fas fa-cloud-upload-alt text-4xl mb-4 text-slate-500 group-hover:text-blue-500"></i>
+                <span class="text-slate-300 font-medium">Click to select CSV or Excel</span>
+                <span class="text-xs text-slate-500 mt-2">Max file size: 50MB</span>
+            </label>
         </div>
 
-        <div id="dashboard" class="hidden space-y-8">
+        <div id="content-area" class="hidden space-y-6">
             
-            <section>
-                <h2 class="section-title">Data Quality Metrics</h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div class="card p-5 border-l-4 border-l-emerald-500">
-                        <div class="text-slate-400 text-sm font-medium mb-1">Overall Quality</div>
-                        <div class="text-3xl font-bold text-white" id="stat-score">--</div>
-                    </div>
-                    <div class="card p-5 border-l-4 border-l-brand-500">
-                        <div class="text-slate-400 text-sm font-medium mb-1">Records Analyzed</div>
-                        <div class="text-3xl font-bold text-white" id="stat-rows">--</div>
-                    </div>
-                    <div class="card p-5 border-l-4 border-l-amber-500">
-                        <div class="text-slate-400 text-sm font-medium mb-1">Anomalies Resolved</div>
-                        <div class="text-3xl font-bold text-white" id="stat-fixed">--</div>
-                    </div>
-                    <div class="card p-5 border-l-4 border-l-rose-500">
-                        <div class="text-slate-400 text-sm font-medium mb-1">Duplicates Purged</div>
-                        <div class="text-3xl font-bold text-white" id="stat-dupes">--</div>
+            <div class="flex items-center gap-4 text-slate-500 text-xs font-mono bg-slate-900/30 p-3 rounded-lg border border-slate-800">
+                <i class="fas fa-file-csv text-blue-400"></i>
+                <span id="file-name-display">sales_data.csv</span>
+                <span class="text-slate-700">|</span>
+                <span id="file-meta">100 rows shown • 14 columns</span>
+            </div>
+
+            <div id="section-data" class="animate-in fade-in duration-500">
+                <div class="glass-card overflow-hidden">
+                    <div class="overflow-x-auto max-h-[600px]">
+                        <table class="w-full custom-table" id="data-table">
+                            <thead><tr id="table-headers"></tr></thead>
+                            <tbody id="table-body"></tbody>
+                        </table>
                     </div>
                 </div>
-            </section>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <section class="lg:col-span-2">
-                    <h2 class="section-title">Visual Analytics</h2>
-                    <div class="grid grid-cols-1 gap-6" id="charts-container">
-                        </div>
-                </section>
-
-                <section class="lg:col-span-1">
-                    <h2 class="section-title">Executive Summary</h2>
-                    <div class="flex flex-col gap-4" id="narrative-container">
-                        </div>
-                </section>
-
             </div>
 
-            <div class="pt-8 pb-12 border-t border-slate-800">
-                <button onclick="location.reload()" class="bg-surface hover:bg-slate-700 text-white px-6 py-2 rounded border border-slate-600 transition-colors font-medium text-sm flex items-center gap-2">
-                    <i class="fas fa-plus"></i> New Analysis
-                </button>
+            <div id="section-viz" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-card p-6 h-[450px]" id="chart-main_bar"></div>
+                <div class="glass-card p-6 h-[450px]" id="chart-distribution"></div>
+                <div class="glass-card p-6 h-[450px] md:col-span-2" id="chart-correlation"></div>
+            </div>
+
+            <div id="section-nar" class="hidden max-w-4xl mx-auto space-y-4">
+                <div id="narrative-list" class="grid gap-4"></div>
             </div>
 
         </div>
     </main>
 
     <script>
-        const fileInput = document.getElementById('file-input');
-        const dropZone = document.getElementById('drop-zone');
-        const uploadSection = document.getElementById('upload-section');
-        const loadingState = document.getElementById('loading-state');
-        const loadingText = document.getElementById('loading-text');
-        const dashboard = document.getElementById('dashboard');
-
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) processFile(e.target.files[0]);
-        });
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-        });
-        function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
-        
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-brand-500', 'bg-slate-800/50'));
-        });
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-brand-500', 'bg-slate-800/50'));
-        });
-        
-        dropZone.addEventListener('drop', (e) => {
-            if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
-        });
-
-        async function processFile(file) {
-            dropZone.style.display = 'none';
-            loadingState.style.display = 'flex';
-            
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const loadingMessages = ["Executing data pipeline...", "Running statistical analysis...", "Rendering dashboard..."];
-            let msgIdx = 0;
-            const msgInterval = setInterval(() => {
-                msgIdx = (msgIdx + 1) % loadingMessages.length;
-                loadingText.innerText = loadingMessages[msgIdx];
-            }, 1200);
-
-            try {
-                const response = await fetch('/upload', { method: 'POST', body: formData });
-                const data = await response.json();
-                
-                clearInterval(msgInterval);
-                
-                if (!response.ok) throw new Error(data.error || 'Pipeline execution failed');
-                
-                uploadSection.style.display = 'none';
-                populateDashboard(data);
-                dashboard.style.display = 'block';
-                setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
-
-            } catch (error) {
-                clearInterval(msgInterval);
-                alert('System Error: ' + error.message);
-                dropZone.style.display = 'block';
-                loadingState.style.display = 'none';
-            }
+        function switchTab(tab) {
+            ['data', 'viz', 'nar'].forEach(t => {
+                document.getElementById(`section-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('tab-active', 'text-white');
+                document.getElementById(`tab-${t}`).classList.add('text-slate-400');
+            });
+            document.getElementById(`section-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-white');
+            // Fix Plotly resize when switching tabs
+            if(tab === 'viz') window.dispatchEvent(new Event('resize'));
         }
 
-        function populateDashboard(data) {
-            document.getElementById("stat-score").innerText = data.summary.quality_score + "%";
-            document.getElementById("stat-rows").innerText = data.summary.final_rows.toLocaleString();
-            document.getElementById("stat-fixed").innerText = (data.summary.missing_fixed + data.summary.outliers_detected).toLocaleString();
-            document.getElementById("stat-dupes").innerText = data.summary.duplicates_removed.toLocaleString();
+        async function handleUpload(input) {
+            if (!input.files[0]) return;
+            const formData = new FormData();
+            formData.append('file', input.files[0]);
 
-            const chartsContainer = document.getElementById('charts-container');
-            chartsContainer.innerHTML = '';
+            document.getElementById('upload-container').innerHTML = `<div class="py-20 text-blue-500 animate-pulse font-bold tracking-widest">ANALYZING DATASET...</div>`;
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                renderDashboard(data);
+            } catch (err) { alert("Error uploading file."); location.reload(); }
+        }
+
+        function renderDashboard(data) {
+            document.getElementById('upload-container').classList.add('hidden');
+            document.getElementById('nav-tabs').classList.remove('hidden');
+            document.getElementById('content-area').classList.remove('hidden');
+
+            document.getElementById('file-name-display').innerText = data.filename;
+            document.getElementById('file-meta').innerText = `${data.summary.rows} rows analyzed • ${data.summary.cols} columns • Quality Score: ${data.summary.score}%`;
+
+            // Render Table
+            const headers = document.getElementById('table-headers');
+            const body = document.getElementById('table-body');
+            headers.innerHTML = data.table.cols.map(c => `<th>${c.header}</th>`).join('');
+            body.innerHTML = data.table.rows.map(row => 
+                `<tr>${data.table.cols.map(c => `<td>${row[c.field] || '-'}</td>`).join('')}</tr>`
+            ).join('');
+
+            // Render Charts
             const config = { responsive: true, displayModeBar: false };
-            
-            Object.keys(data.charts).forEach(key => {
-                const chartDiv = document.createElement('div');
-                // The charts are now inside a clean, solid card matching the background applied in app.py
-                chartDiv.className = 'card overflow-hidden h-[400px] w-full'; 
-                chartDiv.id = `chart-${key}`;
-                chartsContainer.appendChild(chartDiv);
-                
-                const chartData = data.charts[key];
-                Plotly.newPlot(chartDiv.id, chartData.data, chartData.layout, config);
+            Object.keys(data.charts).forEach(id => {
+                Plotly.newPlot(`chart-${id}`, data.charts[id].data, data.charts[id].layout, config);
             });
 
-            const narrativeContainer = document.getElementById('narrative-container');
-            narrativeContainer.innerHTML = '';
-            
-            data.narrative.forEach((item) => {
-                const card = document.createElement('div');
-                card.className = 'card p-5 border-l-4 border-l-slate-500 hover:border-l-brand-500 transition-colors';
-                card.innerHTML = `
-                    <div class="flex items-start gap-3">
-                        <div class="mt-1"><i class="${item.icon} text-lg"></i></div>
-                        <div>
-                            <h3 class="text-sm font-bold text-white mb-1 tracking-wide">${item.title}</h3>
-                            <p class="text-slate-300 text-sm leading-relaxed">${item.text}</p>
-                        </div>
+            // Render Narrative
+            document.getElementById('narrative-list').innerHTML = data.narrative.map(n => `
+                <div class="glass-card p-6 flex gap-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                        <i class="fas fa-lightbulb"></i>
                     </div>
-                `;
-                narrativeContainer.appendChild(card);
-            });
+                    <div>
+                        <h4 class="font-bold text-white mb-1">${n.title}</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">${n.desc}</p>
+                    </div>
+                </div>
+            `).join('');
         }
     </script>
 </body>
