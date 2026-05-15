@@ -3,209 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataStory | Enterprise Analytics</title>
+    <title>DataStory AI | Intelligent Insights</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --primary: #4F46E5; /* Indigo */
+            --bg-light: #F8FAFC;
+            --surface: #FFFFFF;
+            --text-main: #1E293B;
+            --border-color: #E2E8F0;
+        }
+
         body { 
-            background: #020617; 
-            font-family: 'Inter', sans-serif; 
-            color: #e2e8f0; 
-            overflow-x: hidden;
-        }
-        
-        /* Professional Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-
-        /* Component Styles */
-        .glass-card { 
-            background: #0f172a; 
-            border: 1px solid #1e293b; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        
-        .tab-active { 
-            color: #38bdf8; 
-            border-bottom: 2px solid #38bdf8; 
-            background: rgba(56, 189, 248, 0.05); 
+            background: var(--bg-light); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            color: var(--text-main);
         }
 
-        .custom-table th { 
-            background: #1e293b; 
-            color: #38bdf8; 
-            position: sticky; 
-            top: 0; 
-            padding: 14px; 
-            text-align: left; 
-            font-size: 11px; 
-            text-transform: uppercase; 
-            letter-spacing: 0.05em;
-            z-index: 10;
+        /* Professional Header Glow */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .custom-table td { 
-            padding: 12px 14px; 
-            border-bottom: 1px solid #1e293b; 
-            font-size: 13px; 
-            color: #94a3b8; 
-            white-space: nowrap;
+        /* Elegant Cards */
+        .premium-card {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        .premium-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
 
-        .custom-table tr:hover td {
-            background: rgba(255,255,255,0.02);
-            color: #f8fafc;
+        /* Tab Styling */
+        .tab-btn {
+            position: relative;
+            padding: 0.75rem 1.25rem;
+            color: #64748B;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--primary);
+        }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+            border-radius: 10px;
         }
 
-        .status-dot { 
-            width: 8px; height: 8px; 
-            background: #22c55e; 
-            border-radius: 50%; 
-            box-shadow: 0 0 8px #22c55e; 
+        /* Table Styling */
+        .custom-table th {
+            background: #F1F5F9;
+            color: #475569;
+            font-size: 11px;
+            text-transform: uppercase;
+            padding: 12px 16px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        .custom-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
         }
 
-        /* Animations */
-        .fade-in { animation: fadeIn 0.4s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Loading Animation */
+        .loader {
+            border-top-color: var(--primary);
+            animation: spinner 0.8s linear infinite;
+        }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none; }
     </style>
 </head>
-
 <body class="min-h-screen">
 
-    <header class="border-b border-slate-800 bg-[#020617]/90 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/20">
-                    <i class="fas fa-chart-line text-white"></i>
+    <header class="glass-nav sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-18 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-200">
+                    <i class="fas fa-layer-group text-white text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight text-white">DataStory</h1>
-                    <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Intelligent Analytics</p>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900">DataStory<span class="text-indigo-600">.AI</span></h1>
+                    <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Premium Analytics</p>
                 </div>
             </div>
 
-            <div id="nav-tabs" class="hidden flex gap-8 h-full items-center">
-                <button onclick="switchTab('data')" id="tab-data" class="h-full px-4 text-sm font-medium transition-all tab-active">
-                    <i class="fas fa-database mr-2"></i>Data
+            <nav id="nav-tabs" class="hidden flex gap-2">
+                <button onclick="switchTab('data')" id="tab-data" class="tab-btn active">
+                    <i class="fas fa-table-list mr-2"></i>Dataset
                 </button>
-                <button onclick="switchTab('viz')" id="tab-viz" class="h-full px-4 text-sm font-medium transition-all text-slate-400 hover:text-slate-200">
-                    <i class="fas fa-chart-pie mr-2"></i>Visualizations
+                <button onclick="switchTab('viz')" id="tab-viz" class="tab-btn">
+                    <i class="fas fa-chart-line mr-2"></i>Visuals
                 </button>
-                <button onclick="switchTab('nar')" id="tab-nar" class="h-full px-4 text-sm font-medium transition-all text-slate-400 hover:text-slate-200">
-                    <i class="fas fa-magic mr-2"></i>Narrative
+                <button onclick="switchTab('nar')" id="tab-nar" class="tab-btn">
+                    <i class="fas fa-wand-sparkles mr-2"></i>AI Narrative
                 </button>
-            </div>
+            </nav>
 
-            <div class="flex items-center gap-6">
-                <div class="hidden md:flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
-                    <div class="status-dot"></div>
-                    <span class="text-[10px] font-bold text-green-500 uppercase">System Ready</span>
-                </div>
-                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-xs font-semibold border border-slate-700 transition-all">
-                    <i class="fas fa-sync-alt mr-2"></i> Reset Analysis
-                </button>
-            </div>
+            <button onclick="location.reload()" class="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold border border-slate-200 transition-all flex items-center gap-2">
+                <i class="fas fa-plus"></i> New Project
+            </button>
         </div>
     </header>
 
-    <main class="max-w-[1600px] mx-auto p-6">
+    <main class="max-w-7xl mx-auto p-8">
         
-        <div id="upload-container" class="mt-20 max-w-xl mx-auto text-center fade-in">
-            <h2 class="text-3xl font-bold text-white mb-4">Analyze Your Data</h2>
-            <p class="text-slate-400 mb-10 text-sm leading-relaxed">
-                Experience enterprise-grade automated data cleaning and visualization. 
-                Upload any CSV or Excel file to begin.
-            </p>
+        <div id="upload-container" class="mt-12 max-w-2xl mx-auto text-center">
+            <div class="mb-10">
+                <h2 class="text-4xl font-extrabold text-slate-900 mb-4">Transform data into <span class="text-indigo-600">decisions.</span></h2>
+                <p class="text-slate-500 text-lg">Upload your spreadsheet and let our AI handle the cleaning, analysis, and storytelling.</p>
+            </div>
             
-            <label class="glass-card flex flex-col items-center justify-center p-16 border-dashed border-2 border-slate-700 cursor-pointer hover:border-blue-500 hover:bg-slate-900/50 transition-all group">
-                <input type="file" id="file-input" class="hidden" onchange="handleUpload(this)">
-                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <i class="fas fa-file-upload text-2xl text-slate-400 group-hover:text-blue-500"></i>
+            <label class="premium-card block p-16 border-dashed border-2 border-indigo-100 bg-white hover:border-indigo-400 hover:bg-indigo-50/30 cursor-pointer transition-all group">
+                <input type="file" class="hidden" onchange="handleUpload(this)">
+                <div class="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 mx-auto group-hover:scale-110 transition-transform">
+                    <i class="fas fa-cloud-arrow-up text-3xl text-indigo-600"></i>
                 </div>
-                <span class="text-slate-200 font-semibold mb-2">Click to select or drag and drop</span>
-                <span class="text-[11px] text-slate-500 uppercase tracking-tighter">Supported: .CSV, .XLSX, .XLS (Max 50MB)</span>
+                <h4 class="text-slate-800 font-bold text-xl mb-1">Select Dataset</h4>
+                <p class="text-slate-500 text-sm">Drop your CSV or Excel file here</p>
             </label>
         </div>
 
-        <div id="content-area" class="hidden space-y-6 fade-in">
+        <div id="content-area" class="hidden space-y-8">
             
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-800">
-                <div class="flex items-center gap-4">
-                    <div class="p-2 bg-blue-500/10 rounded-lg"><i class="fas fa-file-csv text-blue-500"></i></div>
-                    <div>
-                        <h3 id="file-name-display" class="text-sm font-bold text-white">data_source.csv</h3>
-                        <p id="file-meta" class="text-[11px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">0 Rows • 0 Columns</p>
-                    </div>
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 id="file-name-display" class="text-2xl font-bold text-slate-900">dataset_report.csv</h3>
+                    <p id="file-meta" class="text-sm text-slate-500 font-medium"></p>
                 </div>
-                <div class="flex gap-2">
-                    <div class="px-3 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-300 border border-slate-700 uppercase">Analysis Complete</div>
+                <button id="download-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 transition-all">
+                    <i class="fas fa-download mr-2"></i> Download Cleaned CSV
+                </button>
+            </div>
+
+            <div id="section-data" class="premium-card overflow-hidden">
+                <div class="overflow-x-auto max-h-[600px]">
+                    <table class="w-full custom-table" id="data-table">
+                        <thead><tr id="table-headers"></tr></thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <div id="section-data" class="fade-in">
-                <div class="glass-card overflow-hidden">
-                    <div class="overflow-x-auto max-h-[650px]">
-                        <table class="w-full custom-table" id="data-table">
-                            <thead><tr id="table-headers"></tr></thead>
-                            <tbody id="table-body"></tbody>
-                        </table>
-                    </div>
-                </div>
+            <div id="section-viz" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="premium-card p-6" id="chart-main_bar"></div>
+                <div class="premium-card p-6" id="chart-distribution"></div>
+                <div class="premium-card p-6 lg:col-span-2" id="chart-correlation"></div>
             </div>
 
-            <div id="section-viz" class="hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="glass-card p-4">
-                        <div id="chart-main_bar" class="h-[400px] w-full"></div>
-                    </div>
-                    <div class="glass-card p-4">
-                        <div id="chart-distribution" class="h-[400px] w-full"></div>
-                    </div>
-                    <div class="glass-card p-4 lg:col-span-2">
-                        <div id="chart-correlation" class="h-[500px] w-full"></div>
-                    </div>
+            <div id="section-nar" class="hidden max-w-4xl mx-auto grid gap-6">
                 </div>
-            </div>
-
-            <div id="section-nar" class="hidden max-w-4xl mx-auto space-y-4">
-                <div id="narrative-list" class="grid gap-4">
-                    </div>
-            </div>
 
         </div>
     </main>
 
     <script>
-        // Tab Management
+        // 1. Smooth Tab Switching
         function switchTab(tabId) {
-            const tabs = ['data', 'viz', 'nar'];
-            tabs.forEach(id => {
-                const section = document.getElementById(`section-${id}`);
-                const btn = document.getElementById(`tab-${id}`);
-                if (id === tabId) {
-                    section.classList.remove('hidden');
-                    btn.classList.add('tab-active', 'text-white');
-                    btn.classList.remove('text-slate-400');
-                } else {
-                    section.classList.add('hidden');
-                    btn.classList.remove('tab-active', 'text-white');
-                    btn.classList.add('text-slate-400');
-                }
+            ['data', 'viz', 'nar'].forEach(id => {
+                document.getElementById(`section-${id}`).classList.add('hidden');
+                document.getElementById(`tab-${id}`).classList.remove('active');
             });
             
-            // Resize Plotly charts when switching to Viz tab
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // Force charts to fit container on switch
             if (tabId === 'viz') {
                 window.dispatchEvent(new Event('resize'));
             }
         }
 
-        // File Ingestion Logic
+        // 2. Upload and Backend Communication
         async function handleUpload(input) {
             const file = input.files[0];
             if (!file) return;
@@ -213,90 +199,79 @@
             const formData = new FormData();
             formData.append('file', file);
 
-            // Show Loading State
+            // Professional Loading State
             const container = document.getElementById('upload-container');
-            const originalHTML = container.innerHTML;
             container.innerHTML = `
-                <div class="py-24 text-center">
-                    <div class="inline-block animate-spin mb-6">
-                        <i class="fas fa-circle-notch text-5xl text-blue-500"></i>
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">Analyzing Dataset</h3>
-                    <p class="text-slate-500 text-sm animate-pulse">Running data quality checks and statistical models...</p>
+                <div class="py-20 flex flex-col items-center">
+                    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-16 w-16 mb-6"></div>
+                    <h3 class="text-xl font-bold text-slate-800">Processing Pipeline</h3>
+                    <p class="text-slate-500">Cleansing data and generating AI narratives...</p>
                 </div>
             `;
 
             try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const response = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await response.json();
 
-                if (!response.ok || data.error) {
-                    throw new Error(data.error || "Execution failed on server.");
-                }
+                if (!response.ok || data.error) throw new Error(data.error || "Server Error");
 
                 renderDashboard(data);
 
             } catch (error) {
-                console.error("Pipeline Error:", error);
-                alert("❌ System Error: " + error.message);
-                container.innerHTML = originalHTML; // Restore upload UI
+                alert("Pipeline Interrupted: " + error.message);
+                location.reload();
             }
         }
 
-        // Dashboard Rendering
+        // 3. Render Data to Professional UI
         function renderDashboard(data) {
-            // UI State Change
             document.getElementById('upload-container').classList.add('hidden');
             document.getElementById('nav-tabs').classList.remove('hidden');
             document.getElementById('content-area').classList.remove('hidden');
 
-            // Metadata Update
             document.getElementById('file-name-display').innerText = data.filename;
             document.getElementById('file-meta').innerText = 
-                `${data.summary.rows.toLocaleString()} Records • ${data.summary.cols} Columns • Quality: ${data.summary.score}%`;
+                `${data.summary.rows} Records • ${data.summary.cols} Columns • Data Integrity: ${data.summary.score}%`;
 
-            // 1. Build Table
+            // Render Table
             const headers = document.getElementById('table-headers');
             const body = document.getElementById('table-body');
-            
             headers.innerHTML = data.table.cols.map(c => `<th>${c.header}</th>`).join('');
             body.innerHTML = data.table.rows.map(row => `
-                <tr>
-                    ${data.table.cols.map(c => `<td>${row[c.field] !== null ? row[c.field] : '<span class="opacity-30">N/A</span>'}</td>`).join('')}
-                </tr>
+                <tr>${data.table.cols.map(c => `<td>${row[c.field] || '-'}</td>`).join('')}</tr>
             `).join('');
 
-            // 2. Plot Charts
+            // Render Elegant Charts (Light Theme Layout)
+            const layoutBase = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { family: 'Plus Jakarta Sans', color: '#475569' },
+                margin: { t: 40, r: 20, l: 40, b: 40 }
+            };
+
             const config = { responsive: true, displayModeBar: false };
-            Object.keys(data.charts).forEach(chartId => {
-                const chartElement = document.getElementById(`chart-${chartId}`);
-                if (chartElement) {
-                    Plotly.newPlot(chartId === 'correlation' ? `chart-correlation` : `chart-${chartId}`, 
-                                   data.charts[chartId].data, 
-                                   data.charts[chartId].layout, 
-                                   config);
-                }
+
+            Object.keys(data.charts).forEach(id => {
+                const chartData = data.charts[id];
+                // Update chart layout for light mode
+                const elegantLayout = {...chartData.layout, ...layoutBase};
+                Plotly.newPlot(`chart-${id}`, chartData.data, elegantLayout, config);
             });
 
-            // 3. Build Narrative
-            const narrativeBox = document.getElementById('narrative-list');
-            narrativeBox.innerHTML = data.narrative.map(item => `
-                <div class="glass-card p-6 flex gap-5 hover:border-blue-500/40 transition-all">
-                    <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                        <i class="fas fa-bolt-lightning text-lg"></i>
+            // Render Narrative AI Cards
+            const narBox = document.getElementById('section-nar');
+            narBox.innerHTML = data.narrative.map(item => `
+                <div class="premium-card p-6 flex gap-6 items-start hover:border-indigo-200 transition-all">
+                    <div class="bg-indigo-50 p-4 rounded-2xl text-indigo-600">
+                        <i class="fas fa-lightbulb text-xl"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-white mb-1">${item.title}</h4>
-                        <p class="text-sm text-slate-400 leading-relaxed">${item.desc}</p>
+                        <h4 class="text-lg font-bold text-slate-900 mb-1">${item.title}</h4>
+                        <p class="text-slate-600 leading-relaxed text-sm">${item.desc}</p>
                     </div>
                 </div>
             `).join('');
         }
     </script>
-
 </body>
 </html>
