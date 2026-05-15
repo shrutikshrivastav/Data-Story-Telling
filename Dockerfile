@@ -2,22 +2,26 @@ FROM python:3.11.9-slim
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy application files
+COPY app.py .
+COPY templates/ templates/
 
-RUN mkdir -p /tmp/uploads
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
 
-EXPOSE 10000
+# Expose port
+EXPOSE 8000
 
-CMD gunicorn --bind 0.0.0.0:${PORT:-10000} --workers 1 --timeout 120 --max-requests 1000 app:app
+# Use gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "app:app"]
