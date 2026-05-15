@@ -1,29 +1,265 @@
-<div id="section-viz" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div class="premium-card p-4"><div id="chart-main_bar" class="h-80"></div></div>
-    <div class="premium-card p-4"><div id="chart-distribution" class="h-80"></div></div>
-    <div class="premium-card p-4"><div id="chart-outliers" class="h-80"></div></div>
-    <div class="premium-card p-4 lg:col-span-2"><div id="chart-trend" class="h-80"></div></div>
-    <div class="premium-card p-4"><div id="chart-correlation" class="h-80"></div></div>
-</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataStory AI | Premium Analytics</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<script>
-    // Download function ko script tag mein add karein
-    function setupDownload() {
-        const btn = document.getElementById('download-btn');
-        btn.onclick = () => {
-            window.location.href = '/download';
-        };
-    }
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --bg-light: #F8FAFC;
+            --surface: #FFFFFF;
+            --border: #E2E8F0;
+        }
 
-    // Isko renderDashboard function ke andar call karein
-    function renderDashboard(data) {
-        // ... purana render code ...
-        setupDownload(); // Activate download button
+        body { 
+            background-color: var(--bg-light); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            color: #1E293B;
+            scroll-behavior: smooth;
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .premium-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .premium-card:hover {
+            box-shadow: 0 10px 20px rgba(0,0,0,0.04);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            font-weight: 600;
+            color: #64748B;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <header class="glass-nav sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2 rounded-lg">
+                    <i class="fas fa-chart-pie text-white text-xl"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">DataStory<span class="text-indigo-600">.AI</span></h1>
+            </div>
+
+            <nav id="nav-tabs" class="hidden flex gap-4">
+                <button onclick="switchTab('data')" id="tab-data" class="tab-btn active">Overview</button>
+                <button onclick="switchTab('viz')" id="tab-viz" class="tab-btn">Visuals</button>
+                <button onclick="switchTab('nar')" id="tab-nar" class="tab-btn">AI Insights</button>
+            </nav>
+
+            <button onclick="location.reload()" class="text-sm font-semibold text-slate-600 hover:text-indigo-600">
+                <i class="fas fa-redo-alt mr-1"></i> Start New
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 md:p-10">
         
-        // Re-render all 5 charts
-        const config = { responsive: true, displayModeBar: false };
-        Object.keys(data.charts).forEach(id => {
-            Plotly.newPlot(`chart-${id}`, data.charts[id].data, data.charts[id].layout, config);
-        });
-    }
-</script>
+        <div id="upload-container" class="max-w-xl mx-auto py-20 text-center">
+            <h2 class="text-3xl font-bold text-slate-900 mb-4">Deep Data Analysis. Visualized.</h2>
+            <p class="text-slate-500 mb-10">Upload any CSV or Excel to see the magic happen.</p>
+            
+            <label class="premium-card block p-12 border-dashed border-2 border-indigo-200 cursor-pointer hover:bg-indigo-50/50 transition-all">
+                <input type="file" id="fileInput" class="hidden" onchange="handleUpload()">
+                <i class="fas fa-cloud-upload-alt text-5xl text-indigo-500 mb-4"></i>
+                <p class="text-lg font-semibold">Drop file here or click to browse</p>
+                <p class="text-xs text-slate-400 mt-2">Supports CSV, XLS, XLSX</p>
+            </label>
+        </div>
+
+        <div id="loading-state" class="hidden py-20 text-center">
+            <div class="loader mx-auto mb-4"></div>
+            <p class="font-medium text-slate-600">Analyzing your dataset...</p>
+        </div>
+
+        <div id="content-area" class="hidden space-y-8">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200">
+                <div>
+                    <h2 id="filename-title" class="text-xl font-bold text-slate-800">Filename.csv</h2>
+                    <p id="stats-summary" class="text-sm text-slate-500"></p>
+                </div>
+                <button id="download-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all">
+                    <i class="fas fa-file-csv mr-2"></i> Download Cleaned Data
+                </button>
+            </div>
+
+            <div id="section-data" class="premium-card overflow-hidden">
+                <div class="p-4 border-bottom border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Preview (Top 25 Rows)</span>
+                </div>
+                <div class="overflow-x-auto overflow-y-auto max-h-[500px]">
+                    <table class="w-full text-left border-collapse">
+                        <thead id="table-head" class="sticky top-0 bg-white shadow-sm"></thead>
+                        <tbody id="table-body" class="text-sm text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="section-viz" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="premium-card p-4">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-3">Primary Breakdown</p>
+                    <div id="chart-main_bar" class="h-72"></div>
+                </div>
+                <div class="premium-card p-4">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-3">Proportional Share</p>
+                    <div id="chart-pie" class="h-72"></div>
+                </div>
+                <div class="premium-card p-4">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-3">Value Distribution</p>
+                    <div id="chart-distribution" class="h-72"></div>
+                </div>
+                <div class="premium-card p-4 lg:col-span-2">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-3">Correlation Heatmap</p>
+                    <div id="chart-correlation" class="h-80"></div>
+                </div>
+                <div class="premium-card p-4">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-3">Anomaly Detection</p>
+                    <div id="chart-outliers" class="h-80"></div>
+                </div>
+            </div>
+
+            <div id="section-nar" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                </div>
+
+        </div>
+    </main>
+
+    <script>
+        let cachedCharts = null;
+
+        async function handleUpload() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return;
+
+            // Show Loading
+            document.getElementById('upload-container').classList.add('hidden');
+            document.getElementById('loading-state').classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.error) throw new Error(data.error);
+                renderDashboard(data);
+            } catch (err) {
+                alert("Processing Error: " + err.message);
+                location.reload();
+            }
+        }
+
+        function switchTab(tabId) {
+            ['data', 'viz', 'nar'].forEach(id => {
+                document.getElementById(`section-${id}`).classList.add('hidden');
+                document.getElementById(`tab-${id}`).classList.remove('active');
+            });
+
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // Force Plotly to resize when switching to Viz tab
+            if (tabId === 'viz' && cachedCharts) {
+                setTimeout(() => {
+                    Object.keys(cachedCharts).forEach(id => {
+                        Plotly.Plots.resize(document.getElementById(`chart-${id}`));
+                    });
+                }, 50);
+            }
+        }
+
+        function renderDashboard(data) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('content-area').classList.remove('hidden');
+            document.getElementById('nav-tabs').classList.remove('hidden');
+
+            // Set Meta
+            document.getElementById('filename-title').innerText = data.filename;
+            document.getElementById('stats-summary').innerText = 
+                `${data.summary.rows.toLocaleString()} Records • ${data.summary.cols} Columns • Accuracy: ${data.summary.score}%`;
+
+            // Table Render
+            const thead = document.getElementById('table-head');
+            const tbody = document.getElementById('table-body');
+            
+            thead.innerHTML = `<tr>${data.table.cols.map(c => `<th class="p-4 text-xs font-bold text-slate-500 uppercase border-b">${c.header}</th>`).join('')}</tr>`;
+            tbody.innerHTML = data.table.rows.map(row => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    ${data.table.cols.map(c => `<td class="p-4 border-b border-slate-100">${row[c.field] !== null ? row[c.field] : '-'}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            // Chart Render
+            cachedCharts = data.charts;
+            const config = { responsive: true, displayModeBar: false };
+            
+            Object.keys(data.charts).forEach(id => {
+                const target = document.getElementById(`chart-${id}`);
+                if (target) {
+                    Plotly.newPlot(`chart-${id}`, data.charts[id].data, data.charts[id].layout, config);
+                }
+            });
+
+            // Narrative Render
+            const narBox = document.getElementById('section-nar');
+            narBox.innerHTML = data.narrative.map(n => `
+                <div class="premium-card p-6 border-l-4 border-l-indigo-500">
+                    <h4 class="font-bold text-slate-900 mb-2">${n.title}</h4>
+                    <p class="text-sm text-slate-600 leading-relaxed">${n.desc}</p>
+                </div>
+            `).join('');
+
+            // Setup Download
+            document.getElementById('download-btn').onclick = () => {
+                window.location.href = '/download';
+            };
+        }
+    </script>
+</body>
+</html>
