@@ -3,44 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataStory | Intelligent Analytics</title>
+    <title>DataStory | Enterprise Analytics</title>
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
-        body { background: #020617; font-family: 'Inter', sans-serif; color: #e2e8f0; }
-        .tab-active { color: #38bdf8; border-bottom: 2px solid #38bdf8; background: rgba(56, 189, 248, 0.05); }
-        .glass-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; }
-        .custom-table th { background: #1e293b; color: #38bdf8; position: sticky; top: 0; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
-        .custom-table td { padding: 10px 12px; border-bottom: 1px solid #1e293b; font-size: 13px; color: #94a3b8; }
-        .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; }
+        body { 
+            background: #020617; 
+            font-family: 'Inter', sans-serif; 
+            color: #e2e8f0; 
+            overflow-x: hidden;
+        }
+        
+        /* Professional Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+
+        /* Component Styles */
+        .glass-card { 
+            background: #0f172a; 
+            border: 1px solid #1e293b; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .tab-active { 
+            color: #38bdf8; 
+            border-bottom: 2px solid #38bdf8; 
+            background: rgba(56, 189, 248, 0.05); 
+        }
+
+        .custom-table th { 
+            background: #1e293b; 
+            color: #38bdf8; 
+            position: sticky; 
+            top: 0; 
+            padding: 14px; 
+            text-align: left; 
+            font-size: 11px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em;
+            z-index: 10;
+        }
+
+        .custom-table td { 
+            padding: 12px 14px; 
+            border-bottom: 1px solid #1e293b; 
+            font-size: 13px; 
+            color: #94a3b8; 
+            white-space: nowrap;
+        }
+
+        .custom-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+            color: #f8fafc;
+        }
+
+        .status-dot { 
+            width: 8px; height: 8px; 
+            background: #22c55e; 
+            border-radius: 50%; 
+            box-shadow: 0 0 8px #22c55e; 
+        }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
+
 <body class="min-h-screen">
 
-    <header class="border-b border-slate-800 bg-[#020617]/80 backdrop-blur-md sticky top-0 z-50">
+    <header class="border-b border-slate-800 bg-[#020617]/90 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <div class="bg-blue-600 p-2 rounded-lg"><i class="fas fa-cube text-white"></i></div>
+                <div class="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/20">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight">DataStory</h1>
+                    <h1 class="text-lg font-bold tracking-tight text-white">DataStory</h1>
                     <p class="text-[10px] text-blue-400 uppercase tracking-widest font-bold">Intelligent Analytics</p>
                 </div>
             </div>
 
             <div id="nav-tabs" class="hidden flex gap-8 h-full items-center">
-                <button onclick="switchTab('data')" id="tab-data" class="h-full px-4 text-sm font-medium transition-all tab-active"><i class="fas fa-table mr-2"></i>Data</button>
-                <button onclick="switchTab('viz')" id="tab-viz" class="h-full px-4 text-sm font-medium transition-all text-slate-400"><i class="fas fa-chart-bar mr-2"></i>Visualizations</button>
-                <button onclick="switchTab('nar')" id="tab-nar" class="h-full px-4 text-sm font-medium transition-all text-slate-400"><i class="fas fa-magic mr-2"></i>Narrative</button>
+                <button onclick="switchTab('data')" id="tab-data" class="h-full px-4 text-sm font-medium transition-all tab-active">
+                    <i class="fas fa-database mr-2"></i>Data
+                </button>
+                <button onclick="switchTab('viz')" id="tab-viz" class="h-full px-4 text-sm font-medium transition-all text-slate-400 hover:text-slate-200">
+                    <i class="fas fa-chart-pie mr-2"></i>Visualizations
+                </button>
+                <button onclick="switchTab('nar')" id="tab-nar" class="h-full px-4 text-sm font-medium transition-all text-slate-400 hover:text-slate-200">
+                    <i class="fas fa-magic mr-2"></i>Narrative
+                </button>
             </div>
 
             <div class="flex items-center gap-6">
-                <div class="flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
+                <div class="hidden md:flex items-center gap-2 bg-slate-900/50 px-3 py-1.5 rounded-full border border-slate-800">
                     <div class="status-dot"></div>
-                    <span class="text-[11px] font-bold text-green-500 uppercase">System Online</span>
+                    <span class="text-[10px] font-bold text-green-500 uppercase">System Ready</span>
                 </div>
-                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-all">
-                    <i class="fas fa-plus mr-2"></i> New File
+                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-xs font-semibold border border-slate-700 transition-all">
+                    <i class="fas fa-sync-alt mr-2"></i> Reset Analysis
                 </button>
             </div>
         </div>
@@ -48,29 +116,41 @@
 
     <main class="max-w-[1600px] mx-auto p-6">
         
-        <div id="upload-container" class="mt-20 max-w-xl mx-auto text-center">
-            <h2 class="text-3xl font-bold mb-4">Start your Data Journey</h2>
-            <p class="text-slate-400 mb-8 text-sm">Upload your dataset to generate automated insights and interactive dashboards.</p>
-            <label class="glass-card flex flex-col items-center justify-center p-20 border-dashed border-2 border-slate-700 cursor-pointer hover:border-blue-500 transition-all group">
-                <input type="file" class="hidden" onchange="handleUpload(this)">
-                <i class="fas fa-cloud-upload-alt text-4xl mb-4 text-slate-500 group-hover:text-blue-500"></i>
-                <span class="text-slate-300 font-medium">Click to select CSV or Excel</span>
-                <span class="text-xs text-slate-500 mt-2">Max file size: 50MB</span>
+        <div id="upload-container" class="mt-20 max-w-xl mx-auto text-center fade-in">
+            <h2 class="text-3xl font-bold text-white mb-4">Analyze Your Data</h2>
+            <p class="text-slate-400 mb-10 text-sm leading-relaxed">
+                Experience enterprise-grade automated data cleaning and visualization. 
+                Upload any CSV or Excel file to begin.
+            </p>
+            
+            <label class="glass-card flex flex-col items-center justify-center p-16 border-dashed border-2 border-slate-700 cursor-pointer hover:border-blue-500 hover:bg-slate-900/50 transition-all group">
+                <input type="file" id="file-input" class="hidden" onchange="handleUpload(this)">
+                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-file-upload text-2xl text-slate-400 group-hover:text-blue-500"></i>
+                </div>
+                <span class="text-slate-200 font-semibold mb-2">Click to select or drag and drop</span>
+                <span class="text-[11px] text-slate-500 uppercase tracking-tighter">Supported: .CSV, .XLSX, .XLS (Max 50MB)</span>
             </label>
         </div>
 
-        <div id="content-area" class="hidden space-y-6">
+        <div id="content-area" class="hidden space-y-6 fade-in">
             
-            <div class="flex items-center gap-4 text-slate-500 text-xs font-mono bg-slate-900/30 p-3 rounded-lg border border-slate-800">
-                <i class="fas fa-file-csv text-blue-400"></i>
-                <span id="file-name-display">sales_data.csv</span>
-                <span class="text-slate-700">|</span>
-                <span id="file-meta">100 rows shown • 14 columns</span>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/30 p-4 rounded-xl border border-slate-800">
+                <div class="flex items-center gap-4">
+                    <div class="p-2 bg-blue-500/10 rounded-lg"><i class="fas fa-file-csv text-blue-500"></i></div>
+                    <div>
+                        <h3 id="file-name-display" class="text-sm font-bold text-white">data_source.csv</h3>
+                        <p id="file-meta" class="text-[11px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">0 Rows • 0 Columns</p>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <div class="px-3 py-1 bg-slate-800 rounded text-[10px] font-bold text-slate-300 border border-slate-700 uppercase">Analysis Complete</div>
+                </div>
             </div>
 
-            <div id="section-data" class="animate-in fade-in duration-500">
+            <div id="section-data" class="fade-in">
                 <div class="glass-card overflow-hidden">
-                    <div class="overflow-x-auto max-h-[600px]">
+                    <div class="overflow-x-auto max-h-[650px]">
                         <table class="w-full custom-table" id="data-table">
                             <thead><tr id="table-headers"></tr></thead>
                             <tbody id="table-body"></tbody>
@@ -79,81 +159,144 @@
                 </div>
             </div>
 
-            <div id="section-viz" class="hidden grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="glass-card p-6 h-[450px]" id="chart-main_bar"></div>
-                <div class="glass-card p-6 h-[450px]" id="chart-distribution"></div>
-                <div class="glass-card p-6 h-[450px] md:col-span-2" id="chart-correlation"></div>
+            <div id="section-viz" class="hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-card p-4">
+                        <div id="chart-main_bar" class="h-[400px] w-full"></div>
+                    </div>
+                    <div class="glass-card p-4">
+                        <div id="chart-distribution" class="h-[400px] w-full"></div>
+                    </div>
+                    <div class="glass-card p-4 lg:col-span-2">
+                        <div id="chart-correlation" class="h-[500px] w-full"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="section-nar" class="hidden max-w-4xl mx-auto space-y-4">
-                <div id="narrative-list" class="grid gap-4"></div>
+                <div id="narrative-list" class="grid gap-4">
+                    </div>
             </div>
 
         </div>
     </main>
 
     <script>
-        function switchTab(tab) {
-            ['data', 'viz', 'nar'].forEach(t => {
-                document.getElementById(`section-${t}`).classList.add('hidden');
-                document.getElementById(`tab-${t}`).classList.remove('tab-active', 'text-white');
-                document.getElementById(`tab-${t}`).classList.add('text-slate-400');
+        // Tab Management
+        function switchTab(tabId) {
+            const tabs = ['data', 'viz', 'nar'];
+            tabs.forEach(id => {
+                const section = document.getElementById(`section-${id}`);
+                const btn = document.getElementById(`tab-${id}`);
+                if (id === tabId) {
+                    section.classList.remove('hidden');
+                    btn.classList.add('tab-active', 'text-white');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    section.classList.add('hidden');
+                    btn.classList.remove('tab-active', 'text-white');
+                    btn.classList.add('text-slate-400');
+                }
             });
-            document.getElementById(`section-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).classList.add('tab-active', 'text-white');
-            // Fix Plotly resize when switching tabs
-            if(tab === 'viz') window.dispatchEvent(new Event('resize'));
+            
+            // Resize Plotly charts when switching to Viz tab
+            if (tabId === 'viz') {
+                window.dispatchEvent(new Event('resize'));
+            }
         }
 
+        // File Ingestion Logic
         async function handleUpload(input) {
-            if (!input.files[0]) return;
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
+            const file = input.files[0];
+            if (!file) return;
 
-            document.getElementById('upload-container').innerHTML = `<div class="py-20 text-blue-500 animate-pulse font-bold tracking-widest">ANALYZING DATASET...</div>`;
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show Loading State
+            const container = document.getElementById('upload-container');
+            const originalHTML = container.innerHTML;
+            container.innerHTML = `
+                <div class="py-24 text-center">
+                    <div class="inline-block animate-spin mb-6">
+                        <i class="fas fa-circle-notch text-5xl text-blue-500"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Analyzing Dataset</h3>
+                    <p class="text-slate-500 text-sm animate-pulse">Running data quality checks and statistical models...</p>
+                </div>
+            `;
 
             try {
-                const res = await fetch('/upload', { method: 'POST', body: formData });
-                const data = await res.json();
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error || "Execution failed on server.");
+                }
+
                 renderDashboard(data);
-            } catch (err) { alert("Error uploading file."); location.reload(); }
+
+            } catch (error) {
+                console.error("Pipeline Error:", error);
+                alert("❌ System Error: " + error.message);
+                container.innerHTML = originalHTML; // Restore upload UI
+            }
         }
 
+        // Dashboard Rendering
         function renderDashboard(data) {
+            // UI State Change
             document.getElementById('upload-container').classList.add('hidden');
             document.getElementById('nav-tabs').classList.remove('hidden');
             document.getElementById('content-area').classList.remove('hidden');
 
+            // Metadata Update
             document.getElementById('file-name-display').innerText = data.filename;
-            document.getElementById('file-meta').innerText = `${data.summary.rows} rows analyzed • ${data.summary.cols} columns • Quality Score: ${data.summary.score}%`;
+            document.getElementById('file-meta').innerText = 
+                `${data.summary.rows.toLocaleString()} Records • ${data.summary.cols} Columns • Quality: ${data.summary.score}%`;
 
-            // Render Table
+            // 1. Build Table
             const headers = document.getElementById('table-headers');
             const body = document.getElementById('table-body');
+            
             headers.innerHTML = data.table.cols.map(c => `<th>${c.header}</th>`).join('');
-            body.innerHTML = data.table.rows.map(row => 
-                `<tr>${data.table.cols.map(c => `<td>${row[c.field] || '-'}</td>`).join('')}</tr>`
-            ).join('');
+            body.innerHTML = data.table.rows.map(row => `
+                <tr>
+                    ${data.table.cols.map(c => `<td>${row[c.field] !== null ? row[c.field] : '<span class="opacity-30">N/A</span>'}</td>`).join('')}
+                </tr>
+            `).join('');
 
-            // Render Charts
+            // 2. Plot Charts
             const config = { responsive: true, displayModeBar: false };
-            Object.keys(data.charts).forEach(id => {
-                Plotly.newPlot(`chart-${id}`, data.charts[id].data, data.charts[id].layout, config);
+            Object.keys(data.charts).forEach(chartId => {
+                const chartElement = document.getElementById(`chart-${chartId}`);
+                if (chartElement) {
+                    Plotly.newPlot(chartId === 'correlation' ? `chart-correlation` : `chart-${chartId}`, 
+                                   data.charts[chartId].data, 
+                                   data.charts[chartId].layout, 
+                                   config);
+                }
             });
 
-            // Render Narrative
-            document.getElementById('narrative-list').innerHTML = data.narrative.map(n => `
-                <div class="glass-card p-6 flex gap-4">
-                    <div class="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
-                        <i class="fas fa-lightbulb"></i>
+            // 3. Build Narrative
+            const narrativeBox = document.getElementById('narrative-list');
+            narrativeBox.innerHTML = data.narrative.map(item => `
+                <div class="glass-card p-6 flex gap-5 hover:border-blue-500/40 transition-all">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+                        <i class="fas fa-bolt-lightning text-lg"></i>
                     </div>
                     <div>
-                        <h4 class="font-bold text-white mb-1">${n.title}</h4>
-                        <p class="text-sm text-slate-400 leading-relaxed">${n.desc}</p>
+                        <h4 class="font-bold text-white mb-1">${item.title}</h4>
+                        <p class="text-sm text-slate-400 leading-relaxed">${item.desc}</p>
                     </div>
                 </div>
             `).join('');
         }
     </script>
+
 </body>
 </html>
