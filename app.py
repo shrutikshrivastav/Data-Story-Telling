@@ -4,6 +4,7 @@ import json
 import os
 import re
 import time
+import chardet
 from datetime import datetime
 
 import numpy as np
@@ -23,6 +24,51 @@ ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls"}
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def detect_encoding(file_bytes):
+    """Detect file encoding automatically"""
+    detector = chardet.UniversalDetector()
+    for line in file_bytes.splitlines()[:100]:
+        detector.feed(line)
+        if detector.done:
+            break
+    detector.close()
+    return detector.result['encoding'] or 'utf-8'
+
+def read_file_safely(file_storage):
+    """Read CSV or Excel file with proper encoding detection"""
+    filename = secure_filename(file_storage.filename)
+    extension = filename.rsplit('.', 1)[1].lower()
+    
+    if extension == 'csv':
+        # Read raw bytes for encoding detection
+        file_bytes = file_storage.read()
+        encoding = detect_encoding(file_bytes)
+        file_storage.seek(0)
+        
+        # Try different encodings
+        encodings_to_try = [encoding, 'utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+        
+        for enc in encodings_to_try:
+            try:
+                file_storage.seek(0)
+                return pd.read_csv(file_storage, encoding=enc, encoding_errors='replace')
+            except:
+                continue
+        
+        # Last resort
+        file_storage.seek(0)
+        return pd.read_csv(file_storage, encoding='latin-1', on_bad_lines='skip')
+    
+    elif extension in ['xlsx', 'xls']:
+        try:
+            return pd.read_excel(file_storage, engine='openpyxl')
+        except:
+            file_storage.seek(0)
+            return pd.read_excel(file_storage, engine='xlrd')
+    
+    else:
+        raise ValueError(f"Unsupported file type: {extension}")
+
 def clean_column_name(col):
     """Clean column names for better display"""
     name = str(col).strip().lower()
@@ -41,7 +87,7 @@ def process_data(df):
     original_duplicates = df.duplicated().sum()
     
     # Clean column names
-    df.columns = [clean_name(col) for col in df.columns]
+    df.columns = [clean_column_name(col) for col in df.columns]
     
     # Remove completely empty rows
     df = df.dropna(how='all')
@@ -53,31 +99,46 @@ def process_data(df):
     for col in df.columns:
         if df[col].isna().sum() > 0:
             if pd.api.types.is_numeric_dtype(df[col]):
-                df[col].fillna(df[col].median() if not df[col].isna().all() else 0, inplace=True)
+                median_val = df[col].median()
+                if pd.isna(median_val):
+                    median_val = 0
+                df[col].fillna(median_val, inplace=True)
             else:
-                df[col].fillna("Unknown", inplace=True)
+                mode_val = df[col].mode()
+                if len(mode_val) > 0 and not pd.isna(mode_val[0]):
+                    df[col].fillna(mode_val[0], inplace=True)
+                else:
+                    df[col].fillna("Unknown", inplace=True)
     
-    # Convert types
+    # Convert types safely
     for col in df.columns:
         if df[col].dtype == 'object':
-            # Try numeric
-            numeric_attempt = pd.to_numeric(df[col], errors='coerce')
-            if numeric_attempt.notna().mean() > 0.8:
-                df[col] = numeric_attempt
-            else:
-                # Try date
-                date_attempt = pd.to_datetime(df[col], errors='coerce')
-                if date_attempt.notna().mean() > 0.7:
-                    df[col] = date_attempt
+            # Try numeric conversion
+            try:
+                numeric_attempt = pd.to_numeric(df[col], errors='coerce')
+                if numeric_attempt.notna().mean() > 0.8:
+                    df[col] = numeric_attempt
+            except:
+                pass
+            
+            # Try date conversion
+            if df[col].dtype == 'object':
+                try:
+                    date_attempt = pd.to_datetime(df[col], errors='coerce')
+                    if date_attempt.notna().mean() > 0.7:
+                        df[col] = date_attempt
+                except:
+                    pass
     
-    # Detect numeric columns
+    # Detect column types
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     date_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
     
     # Calculate quality score
     final_missing = df.isna().sum().sum()
-    missing_rate = original_missing / (original_rows * original_cols) if original_rows * original_cols > 0 else 0
+    total_cells = original_rows * original_cols
+    missing_rate = original_missing / total_cells if total_cells > 0 else 0
     duplicate_rate = original_duplicates / original_rows if original_rows > 0 else 0
     
     quality_score = max(0, min(100, 100 - (missing_rate * 30 + duplicate_rate * 20) * 100))
@@ -87,8 +148,16 @@ def process_data(df):
     return {
         'df': df,
         'summary': {
-            'before': {'rows': original_rows, 'columns': original_cols, 'missing': int(original_missing)},
-            'after': {'rows': len(df), 'columns': len(df.columns), 'missing': int(final_missing)},
+            'before': {
+                'rows': original_rows, 
+                'columns': original_cols, 
+                'missing': int(original_missing)
+            },
+            'after': {
+                'rows': len(df), 
+                'columns': len(df.columns), 
+                'missing': int(final_missing)
+            },
             'duplicates_removed': int(original_duplicates),
             'quality_score': round(quality_score, 1),
             'numeric_columns': numeric_cols,
@@ -105,69 +174,90 @@ def create_charts(df, summary):
     categorical_cols = summary['categorical_columns']
     date_cols = summary['date_columns']
     
-    # Sample large datasets for performance
+    if not numeric_cols:
+        return charts
+    
+    # Sample for performance
     plot_df = df if len(df) <= 3000 else df.sample(n=3000, random_state=42)
     
-    # 1. Key Metrics Bar Chart
+    # 1. Bar Chart
     if categorical_cols and numeric_cols:
         try:
             cat = categorical_cols[0]
             num = numeric_cols[0]
             top_data = df.groupby(cat)[num].sum().sort_values(ascending=False).head(10).reset_index()
-            fig = px.bar(top_data, x=cat, y=num, color=num, 
-                        color_continuous_scale='Viridis',
-                        title=f'Top {cat} by {num}')
-            fig.update_layout(height=450, template='plotly_dark')
-            charts.append({
-                'id': 'chart1',
-                'title': f'{num} Distribution by Category',
-                'type': 'bar',
-                'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                'insight': f'The top performing category shows significant variation in {num} values.'
-            })
-        except:
-            pass
+            if len(top_data) > 1:
+                fig = px.bar(top_data, x=cat, y=num, color=num, 
+                            color_continuous_scale='Blues',
+                            title=f'{num} by {cat}')
+                fig.update_layout(
+                    height=420,
+                    template='plotly_dark',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#94a3b8')
+                )
+                charts.append({
+                    'id': 'chart1',
+                    'title': f'Top {cat} by {num}',
+                    'type': 'bar',
+                    'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
+                    'insight': f'{cat} shows significant variation in {num} values.'
+                })
+        except Exception as e:
+            print(f"Bar chart error: {e}")
     
-    # 2. Trend Line Chart
+    # 2. Time Series
     if date_cols and numeric_cols:
         try:
             date_col = date_cols[0]
             num_col = numeric_cols[0]
             timeline = df[[date_col, num_col]].dropna().copy()
-            timeline[date_col] = pd.to_datetime(timeline[date_col])
-            timeline = timeline.sort_values(date_col)
-            if len(timeline) > 1:
+            timeline[date_col] = pd.to_datetime(timeline[date_col], errors='coerce')
+            timeline = timeline.dropna().sort_values(date_col)
+            
+            if len(timeline) > 3:
                 fig = px.line(timeline, x=date_col, y=num_col, 
-                             title=f'{num_col} Over Time',
+                             title=f'{num_col} over time',
                              markers=True)
-                fig.update_layout(height=450, template='plotly_dark')
+                fig.update_layout(
+                    height=420,
+                    template='plotly_dark',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
                 charts.append({
                     'id': 'chart2',
                     'title': 'Time Series Analysis',
                     'type': 'line',
                     'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                    'insight': f'{num_col} shows temporal patterns worth monitoring.'
+                    'insight': f'{num_col} shows temporal patterns that may indicate seasonality.'
                 })
-        except:
-            pass
+        except Exception as e:
+            print(f"Time series error: {e}")
     
-    # 3. Distribution Histogram
+    # 3. Distribution
     if numeric_cols:
         try:
             num = numeric_cols[0]
             fig = px.histogram(plot_df, x=num, nbins=30, 
                               marginal='box',
                               title=f'Distribution of {num}')
-            fig.update_layout(height=450, template='plotly_dark')
+            fig.update_layout(
+                height=420,
+                template='plotly_dark',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
             charts.append({
                 'id': 'chart3',
-                'title': f'{num} Distribution Pattern',
+                'title': f'{num} Distribution',
                 'type': 'histogram',
                 'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                'insight': 'The distribution reveals data concentration patterns and potential outliers.'
+                'insight': 'Distribution shape indicates data concentration and potential outliers.'
             })
-        except:
-            pass
+        except Exception as e:
+            print(f"Histogram error: {e}")
     
     # 4. Correlation Heatmap
     if len(numeric_cols) >= 2:
@@ -175,17 +265,22 @@ def create_charts(df, summary):
             corr_matrix = df[numeric_cols].corr()
             fig = px.imshow(corr_matrix, text_auto=True, aspect='auto',
                            color_continuous_scale='RdBu_r',
-                           title='Feature Correlation Matrix')
-            fig.update_layout(height=500, template='plotly_dark')
+                           title='Correlation Matrix')
+            fig.update_layout(
+                height=480,
+                template='plotly_dark',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
             charts.append({
                 'id': 'chart4',
-                'title': 'Correlation Analysis',
+                'title': 'Variable Correlations',
                 'type': 'heatmap',
                 'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                'insight': 'Strong correlations indicate relationships between variables.'
+                'insight': 'Strong correlations suggest relationships between variables.'
             })
-        except:
-            pass
+        except Exception as e:
+            print(f"Heatmap error: {e}")
     
     # 5. Pie Chart
     if categorical_cols:
@@ -193,71 +288,89 @@ def create_charts(df, summary):
             cat = categorical_cols[0]
             top_cats = df[cat].value_counts().head(6).reset_index()
             top_cats.columns = [cat, 'count']
-            fig = px.pie(top_cats, names=cat, values='count', 
-                        title=f'{cat} Distribution',
-                        hole=0.3)
-            fig.update_layout(height=450, template='plotly_dark')
-            charts.append({
-                'id': 'chart5',
-                'title': f'{cat} Breakdown',
-                'type': 'pie',
-                'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                'insight': 'Category distribution shows data composition and dominant segments.'
-            })
-        except:
-            pass
+            if len(top_cats) > 1:
+                fig = px.pie(top_cats, names=cat, values='count', 
+                            title=f'{cat} Distribution',
+                            hole=0.3)
+                fig.update_layout(
+                    height=420,
+                    template='plotly_dark',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)'
+                )
+                charts.append({
+                    'id': 'chart5',
+                    'title': f'{cat} Breakdown',
+                    'type': 'pie',
+                    'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
+                    'insight': f'{cat} distribution shows data composition across categories.'
+                })
+        except Exception as e:
+            print(f"Pie chart error: {e}")
     
     # 6. Scatter Plot
     if len(numeric_cols) >= 2:
         try:
-            fig = px.scatter(plot_df.head(1000), x=numeric_cols[0], y=numeric_cols[1],
+            x_col = numeric_cols[0]
+            y_col = numeric_cols[1]
+            fig = px.scatter(plot_df.head(1000), x=x_col, y=y_col,
                             color=categorical_cols[0] if categorical_cols else None,
-                            title=f'{numeric_cols[0]} vs {numeric_cols[1]}',
-                            opacity=0.6)
-            fig.update_layout(height=450, template='plotly_dark')
+                            title=f'{x_col} vs {y_col}',
+                            opacity=0.6,
+                            trendline='ols' if len(plot_df) > 10 else None)
+            fig.update_layout(
+                height=420,
+                template='plotly_dark',
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
             charts.append({
                 'id': 'chart6',
-                'title': 'Relationship Analysis',
+                'title': f'{x_col} vs {y_col}',
                 'type': 'scatter',
                 'figure': json.loads(json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)),
-                'insight': 'Scatter plot reveals correlation patterns between key metrics.'
+                'insight': f'Relationship between {x_col} and {y_col} shows correlation pattern.'
             })
-        except:
-            pass
+        except Exception as e:
+            print(f"Scatter error: {e}")
     
     return charts
 
 def generate_insights(df, summary):
-    """Generate AI-powered insights"""
+    """Generate data insights"""
     insights = []
     numeric_cols = summary['numeric_columns']
     categorical_cols = summary['categorical_columns']
     
-    # Data quality insight
+    # Quality insight
     quality = summary['quality_score']
     if quality >= 85:
-        quality_text = "Excellent data quality with minimal preprocessing required."
+        quality_text = "Dataset quality is excellent with minimal preprocessing required."
     elif quality >= 70:
-        quality_text = "Good data quality with some missing values handled."
+        quality_text = "Dataset quality is good with standard cleaning applied."
     else:
-        quality_text = "Fair data quality - significant cleaning was performed."
+        quality_text = "Dataset required significant cleaning but is now ready for analysis."
     
     insights.append({
-        'title': '📊 Data Quality Assessment',
-        'content': f"{quality_text} Quality Score: {quality}/100. {summary['duplicates_removed']} duplicates removed.",
+        'title': 'Data Quality Assessment',
+        'content': f"{quality_text} Quality score: {quality}/100. Removed {summary['duplicates_removed']} duplicate records.",
         'icon': 'quality'
     })
     
-    # Top performer insight
+    # Top performer
     if categorical_cols and numeric_cols:
         try:
             cat = categorical_cols[0]
             num = numeric_cols[0]
-            top = df.groupby(cat)[num].sum().sort_values(ascending=False).head(1)
-            if len(top) > 0:
+            grouped = df.groupby(cat)[num].sum().sort_values(ascending=False)
+            if len(grouped) > 0:
+                top_category = grouped.index[0]
+                top_value = grouped.iloc[0]
+                total = grouped.sum()
+                share = (top_value / total * 100) if total > 0 else 0
                 insights.append({
-                    'title': '🏆 Top Performance Insight',
-                    'content': f"{top.index[0]} leads in {num} with {top.values[0]:,.2f} total value.",
+                    'title': 'Category Leadership',
+                    'content': f"{top_category} leads in {num} with {top_value:,.2f}, representing {share:.1f}% of total.",
                     'icon': 'performance'
                 })
         except:
@@ -266,38 +379,55 @@ def generate_insights(df, summary):
     # Trend insight
     if summary['date_columns'] and numeric_cols:
         insights.append({
-            'title': '📈 Trend Detection',
-            'content': f"Time-based patterns detected in {numeric_cols[0]}. Monitor seasonal variations for better forecasting.",
+            'title': 'Temporal Patterns',
+            'content': f"Time-based analysis shows variations in {numeric_cols[0]}. Monitor these patterns for forecasting.",
             'icon': 'trend'
         })
     
     # Correlation insight
     if len(numeric_cols) >= 2:
         try:
-            corr = df[numeric_cols].corr().values
-            max_corr = np.max(corr[corr < 0.99])
-            if max_corr > 0.7:
+            corr_matrix = df[numeric_cols].corr()
+            max_corr = 0
+            corr_pair = ""
+            for i in range(len(numeric_cols)):
+                for j in range(i+1, len(numeric_cols)):
+                    val = abs(corr_matrix.iloc[i, j])
+                    if val > max_corr and val < 0.99:
+                        max_corr = val
+                        corr_pair = f"{numeric_cols[i]} and {numeric_cols[j]}"
+            
+            if max_corr > 0.5:
+                strength = "strong" if max_corr > 0.7 else "moderate"
+                direction = "positive" if corr_matrix.iloc[i, j] > 0 else "negative"
                 insights.append({
-                    'title': '🔗 Strong Correlation Found',
-                    'content': f"Strong relationship detected between variables ({max_corr:.2f}). This suggests predictive potential.",
+                    'title': 'Variable Relationships',
+                    'content': f"{strength.capitalize()} {direction} correlation ({max_corr:.2f}) found between {corr_pair}.",
                     'icon': 'correlation'
                 })
         except:
             pass
     
-    # Outlier insight
+    # Outlier detection
     outlier_count = 0
+    outlier_cols = []
     for col in numeric_cols[:3]:
-        q1 = df[col].quantile(0.25)
-        q3 = df[col].quantile(0.75)
-        iqr = q3 - q1
-        outliers = df[(df[col] < q1 - 1.5*iqr) | (df[col] > q3 + 1.5*iqr)]
-        outlier_count += len(outliers)
+        try:
+            q1 = df[col].quantile(0.25)
+            q3 = df[col].quantile(0.75)
+            iqr = q3 - q1
+            if iqr > 0:
+                outliers = df[(df[col] < q1 - 1.5*iqr) | (df[col] > q3 + 1.5*iqr)]
+                if len(outliers) > 0:
+                    outlier_count += len(outliers)
+                    outlier_cols.append(col)
+        except:
+            pass
     
     if outlier_count > 0:
         insights.append({
-            'title': '⚠️ Anomaly Detection',
-            'content': f"Detected {outlier_count} potential outliers that may represent exceptional business events.",
+            'title': 'Anomaly Detection',
+            'content': f"Found {outlier_count} potential outliers in {', '.join(outlier_cols[:2])}. These may represent exceptional cases.",
             'icon': 'outlier'
         })
     
@@ -320,14 +450,8 @@ def upload_file():
         return jsonify({'error': 'Only CSV, XLSX, XLS files allowed'}), 400
     
     try:
-        # Read file
-        filename = secure_filename(file.filename)
-        ext = filename.rsplit('.', 1)[1].lower()
-        
-        if ext == 'csv':
-            df = pd.read_csv(file)
-        else:
-            df = pd.read_excel(file)
+        # Read file with proper encoding
+        df = read_file_safely(file)
         
         if df.empty:
             return jsonify({'error': 'File is empty'}), 400
@@ -346,12 +470,16 @@ def upload_file():
         # Generate KPIs
         kpis = []
         for col in summary['numeric_columns'][:4]:
-            if col in cleaned_df.columns:
+            if col in cleaned_df.columns and len(cleaned_df[col].dropna()) > 0:
                 mean_val = cleaned_df[col].mean()
+                if len(cleaned_df) > 1 and cleaned_df[col].iloc[0] != 0:
+                    change = ((cleaned_df[col].iloc[-1] - cleaned_df[col].iloc[0]) / abs(cleaned_df[col].iloc[0]) * 100)
+                else:
+                    change = 0
                 kpis.append({
                     'label': col.replace('_', ' ').title(),
                     'value': f"{mean_val:,.2f}",
-                    'change': round((cleaned_df[col].iloc[-1] - cleaned_df[col].iloc[0]) / cleaned_df[col].iloc[0] * 100 if len(cleaned_df) > 1 and cleaned_df[col].iloc[0] != 0 else 0, 1)
+                    'change': round(change, 1)
                 })
         
         # Prepare download
@@ -359,24 +487,29 @@ def upload_file():
         cleaned_df.to_csv(csv_buffer, index=False)
         download_payload = base64.b64encode(csv_buffer.getvalue().encode()).decode()
         
-        # Preview
-        preview = cleaned_df.head(8).fillna('').astype(str)
+        # Preview (first 8 rows)
+        preview_df = cleaned_df.head(8).fillna('')
+        for col in preview_df.columns:
+            if pd.api.types.is_datetime64_any_dtype(preview_df[col]):
+                preview_df[col] = preview_df[col].dt.strftime('%Y-%m-%d')
         
         return jsonify({
             'success': True,
-            'filename': filename,
+            'filename': file.filename,
             'summary': summary,
             'kpis': kpis,
             'charts': charts,
             'insights': insights,
             'preview': {
-                'columns': preview.columns.tolist(),
-                'rows': preview.values.tolist()
+                'columns': preview_df.columns.tolist(),
+                'rows': preview_df.astype(str).values.tolist()
             },
             'download_url': download_payload
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Processing error: {str(e)}'}), 500
 
 if __name__ == '__main__':
