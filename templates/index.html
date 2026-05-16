@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Storyteller | Narrative Intelligence Platform</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Data Storyteller | Narrative Intelligence</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,11 +19,27 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        'sans': ['Inter', 'system-ui', -apple-system, 'Segoe UI', 'Roboto', 'sans-serif'],
+                        'sans': ['Inter', 'system-ui', -apple-system, 'BlinkMacSystemFont', 'sans-serif'],
                     },
-                    colors: {
-                        'slate-850': '#1e293b',
-                        'slate-925': '#0f172a',
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 3s ease-in-out infinite',
+                        'shimmer': 'shimmer 2s linear infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%, 100%': { opacity: 0.5 },
+                            '50%': { opacity: 1 },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' },
+                        },
                     }
                 }
             }
@@ -31,49 +47,145 @@
     </script>
     
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
         body {
-            background: linear-gradient(180deg, #0f172a 0%, #1e1b4b 100%);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: radial-gradient(ellipse at 20% 30%, #0f0c29, #1a1a3e, #0b0b1a);
+            font-family: 'Inter', sans-serif;
             min-height: 100vh;
+            position: relative;
         }
         
-        /* Subtle grid pattern */
-        .grid-pattern {
-            background-image: 
-                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-            background-size: 50px 50px;
+        /* Animated background orbs */
+        .orb-1 {
+            position: fixed;
+            top: -20%;
+            right: -10%;
+            width: 60%;
+            height: 60%;
+            background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 20s ease-in-out infinite;
         }
         
-        /* Glass effect */
-        .glass-panel {
-            background: rgba(15, 23, 42, 0.6);
+        .orb-2 {
+            position: fixed;
+            bottom: -20%;
+            left: -10%;
+            width: 50%;
+            height: 50%;
+            background: radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 25s ease-in-out infinite reverse;
+        }
+        
+        .orb-3 {
+            position: fixed;
+            top: 40%;
+            right: 20%;
+            width: 30%;
+            height: 30%;
+            background: radial-gradient(circle, rgba(6,182,212,0.08) 0%, rgba(6,182,212,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 18s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(5deg); }
+            66% { transform: translate(-20px, 20px) rotate(-3deg); }
+        }
+        
+        /* Glassmorphism core */
+        .glass {
+            background: rgba(15, 25, 45, 0.55);
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px;
         }
         
         .glass-card {
-            background: rgba(30, 41, 59, 0.5);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            transition: all 0.2s ease;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            transition: all 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1);
         }
         
         .glass-card:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            background: rgba(30, 41, 59, 0.6);
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.3);
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+            box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Gradient borders */
+        .gradient-border {
+            position: relative;
+            background: rgba(15, 25, 45, 0.6);
+            border-radius: 28px;
+        }
+        
+        .gradient-border::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 28px;
+            padding: 1px;
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3), rgba(6,182,212,0.3));
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
         }
         
         /* Drop zone */
         .drop-zone {
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            background: rgba(15, 25, 45, 0.4);
         }
         
         .drop-zone.drag-over {
             border-color: #3b82f6;
-            background: rgba(59, 130, 246, 0.08);
+            background: rgba(59, 130, 246, 0.1);
+            transform: scale(1.01);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(59, 130, 246, 0.2);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Progress bar */
+        .progress-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s linear infinite;
+            border-radius: 3px;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
         }
         
         /* Chart container */
@@ -89,104 +201,124 @@
         }
         
         ::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
         }
         
         ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(59, 130, 246, 0.4);
             border-radius: 10px;
         }
         
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(59, 130, 246, 0.6);
         }
         
-        /* Loading spinner */
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255,255,255,0.1);
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* Fade in animation */
+        /* Fade animations */
         .fade-in {
-            animation: fadeIn 0.4s ease-out;
+            animation: fadeInUp 0.5s ease-out forwards;
         }
         
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
-        /* Stats counter */
+        /* Number counter */
         .stat-value {
             font-feature-settings: "tnum";
             font-variant-numeric: tabular-nums;
         }
+        
+        /* Button hover */
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(139,92,246,0.9));
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            transform: scale(1.02);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Text gradient */
+        .text-gradient {
+            background: linear-gradient(135deg, #60a5fa, #a78bfa, #22d3ee);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
     </style>
 </head>
-<body class="grid-pattern">
+<body>
     
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+    <!-- Animated Background Orbs -->
+    <div class="orb-1"></div>
+    <div class="orb-2"></div>
+    <div class="orb-3"></div>
+    
+    <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         
         <!-- Header -->
-        <div class="flex items-center justify-between mb-10 pb-4 border-b border-white/10">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                    </svg>
+        <div class="flex items-center justify-between mb-12 pb-4 border-b border-white/10 fade-in">
+            <div class="flex items-center gap-4">
+                <div class="relative">
+                    <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl blur-lg opacity-50"></div>
+                    <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-white tracking-tight">Data Storyteller</h1>
+                    <h1 class="text-2xl font-bold text-white tracking-tight">Data Storyteller</h1>
                     <p class="text-xs text-slate-400">narrative intelligence platform</p>
                 </div>
             </div>
             
             <div class="hidden md:flex gap-2">
-                <span class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-lg">CSV</span>
-                <span class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-lg">Excel</span>
-                <span class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-lg">Auto-Clean</span>
-                <span class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-lg">Visualize</span>
+                <div class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-xl border border-white/10">CSV</div>
+                <div class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-xl border border-white/10">Excel</div>
+                <div class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-xl border border-white/10">Auto-Clean</div>
+                <div class="px-3 py-1.5 text-xs font-medium text-slate-300 bg-white/5 rounded-xl border border-white/10">Visualize</div>
             </div>
         </div>
         
         <!-- Hero Section -->
-        <div class="grid lg:grid-cols-2 gap-8 mb-12">
-            <div class="space-y-5 pt-4">
+        <div class="grid lg:grid-cols-2 gap-10 mb-12 fade-in" style="animation-delay: 0.1s">
+            <div class="space-y-6 pt-6">
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span class="text-xs text-slate-300">instant insights · no configuration</span>
                 </div>
-                <h2 class="text-4xl lg:text-5xl font-bold text-white tracking-tight leading-tight">
-                    Turn spreadsheets into<br/>
-                    <span class="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">data stories</span>
+                <h2 class="text-4xl lg:text-5xl font-bold tracking-tight leading-tight">
+                    <span class="text-white">Turn spreadsheets into</span><br/>
+                    <span class="text-gradient">data stories</span>
                 </h2>
                 <p class="text-slate-300 text-base leading-relaxed max-w-lg">
                     Upload your CSV or Excel file. The platform automatically cleans, analyzes, and generates professional visualizations with contextual insights.
                 </p>
-                <div class="flex gap-4 text-sm text-slate-400">
-                    <div class="flex items-center gap-1.5">
+                <div class="flex flex-wrap gap-4 text-sm text-slate-400">
+                    <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                         <span>Auto-cleaning</span>
                     </div>
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                         <span>6 chart types</span>
                     </div>
-                    <div class="flex items-center gap-1.5">
+                    <div class="flex items-center gap-2">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
@@ -196,18 +328,18 @@
             </div>
             
             <!-- Upload Card -->
-            <div class="glass-panel rounded-2xl p-6">
+            <div class="glass p-6">
                 <form id="uploadForm" enctype="multipart/form-data">
-                    <label id="dropZone" class="drop-zone flex flex-col items-center justify-center border-2 border-dashed border-white/20 rounded-xl p-8 cursor-pointer transition-all">
+                    <label id="dropZone" class="drop-zone flex flex-col items-center justify-center rounded-2xl p-10 cursor-pointer transition-all">
                         <input type="file" id="fileInput" name="file" accept=".csv,.xlsx,.xls" class="hidden" />
-                        <div class="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
-                            <svg class="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-5 border border-white/10">
+                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                             </svg>
                         </div>
-                        <p class="text-white font-medium mb-1">Drop your file here</p>
+                        <p class="text-white font-semibold text-lg mb-1">Drop your file here</p>
                         <p id="fileName" class="text-slate-400 text-sm">CSV, XLSX, or XLS (max 32MB)</p>
-                        <button type="submit" class="mt-6 px-6 py-2.5 bg-white/10 hover:bg-white/15 rounded-xl text-white text-sm font-medium transition-all border border-white/10">
+                        <button type="submit" class="btn-primary mt-8 px-6 py-2.5 rounded-xl text-white text-sm font-medium transition-all">
                             Analyze dataset
                         </button>
                     </label>
@@ -216,20 +348,21 @@
         </div>
         
         <!-- Loading State -->
-        <div id="loadingState" class="hidden glass-panel rounded-2xl p-8 mb-8">
-            <div class="flex flex-col items-center justify-center gap-4">
+        <div id="loadingState" class="hidden glass p-8 mb-8 fade-in">
+            <div class="flex flex-col items-center justify-center gap-5">
                 <div class="spinner"></div>
                 <div class="text-center">
-                    <p class="text-white font-medium">Processing dataset</p>
-                    <p class="text-slate-400 text-sm mt-1">Cleaning, analyzing, and generating visualizations...</p>
+                    <p class="text-white font-medium text-lg">Processing dataset</p>
+                    <p class="text-slate-400 text-sm mt-2">Cleaning, analyzing, and generating visualizations...</p>
                 </div>
+                <div class="w-64 progress-bar"></div>
             </div>
         </div>
         
         <!-- Error State -->
-        <div id="errorState" class="hidden bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8">
+        <div id="errorState" class="hidden bg-red-500/10 border border-red-500/30 rounded-2xl p-4 mb-8 fade-in">
             <div class="flex items-center gap-3">
-                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 <p id="errorMessage" class="text-red-300 text-sm"></p>
@@ -237,46 +370,54 @@
         </div>
         
         <!-- Dashboard Results -->
-        <div id="dashboard" class="hidden space-y-8 fade-in">
+        <div id="dashboard" class="hidden space-y-8">
             
             <!-- Quality Overview Cards -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="glass-card rounded-xl p-4">
-                    <p class="text-slate-400 text-xs uppercase tracking-wide">quality score</p>
-                    <p id="qualityScore" class="text-2xl font-bold text-white mt-1 stat-value">--</p>
-                    <p class="text-slate-500 text-xs mt-1">overall rating</p>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 fade-in">
+                <div class="glass-card p-5">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-slate-400 text-xs uppercase tracking-wider">quality score</p>
+                        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <p id="qualityScore" class="text-3xl font-bold text-white stat-value">--</p>
+                    <p class="text-slate-500 text-xs mt-2">overall rating</p>
                 </div>
-                <div class="glass-card rounded-xl p-4">
-                    <p class="text-slate-400 text-xs uppercase tracking-wide">duplicates</p>
-                    <p id="duplicatesRemoved" class="text-2xl font-bold text-white mt-1 stat-value">--</p>
-                    <p class="text-slate-500 text-xs mt-1">removed</p>
+                <div class="glass-card p-5">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider mb-2">duplicates</p>
+                    <p id="duplicatesRemoved" class="text-3xl font-bold text-white stat-value">--</p>
+                    <p class="text-slate-500 text-xs mt-2">removed</p>
                 </div>
-                <div class="glass-card rounded-xl p-4">
-                    <p class="text-slate-400 text-xs uppercase tracking-wide">missing values</p>
-                    <p id="missingFixed" class="text-2xl font-bold text-white mt-1 stat-value">--</p>
-                    <p class="text-slate-500 text-xs mt-1">imputed</p>
+                <div class="glass-card p-5">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider mb-2">missing values</p>
+                    <p id="missingFixed" class="text-3xl font-bold text-white stat-value">--</p>
+                    <p class="text-slate-500 text-xs mt-2">imputed</p>
                 </div>
-                <div class="glass-card rounded-xl p-4">
-                    <p class="text-slate-400 text-xs uppercase tracking-wide">records</p>
-                    <p id="recordCount" class="text-2xl font-bold text-white mt-1 stat-value">--</p>
-                    <p class="text-slate-500 text-xs mt-1">after cleaning</p>
+                <div class="glass-card p-5">
+                    <p class="text-slate-400 text-xs uppercase tracking-wider mb-2">records</p>
+                    <p id="recordCount" class="text-3xl font-bold text-white stat-value">--</p>
+                    <p class="text-slate-500 text-xs mt-2">after cleaning</p>
                 </div>
             </div>
             
-            <!-- Data Summary Table -->
-            <div class="glass-panel rounded-2xl p-5">
+            <!-- Data Summary -->
+            <div class="glass-card p-5 fade-in" style="animation-delay: 0.05s">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-white font-semibold">Data summary</h3>
-                    <button id="downloadBtn" class="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs text-slate-300 transition-colors">
+                    <button id="downloadBtn" class="px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-xs text-slate-300 transition-all flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
                         Download cleaned CSV
                     </button>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-white/5 rounded-lg p-3">
+                    <div class="bg-white/5 rounded-xl p-4">
                         <p class="text-slate-400 text-xs">before</p>
                         <p id="beforeStatsText" class="text-white text-sm mt-1 font-mono">--</p>
                     </div>
-                    <div class="bg-white/5 rounded-lg p-3">
+                    <div class="bg-white/5 rounded-xl p-4">
                         <p class="text-slate-400 text-xs">after</p>
                         <p id="afterStatsText" class="text-white text-sm mt-1 font-mono">--</p>
                     </div>
@@ -284,26 +425,47 @@
             </div>
             
             <!-- KPI Row -->
-            <div>
-                <h3 class="text-white font-semibold mb-3">Key metrics</h3>
-                <div id="kpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+            <div class="fade-in" style="animation-delay: 0.1s">
+                <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    Key metrics
+                </h3>
+                <div id="kpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></div>
             </div>
             
             <!-- Charts Grid -->
-            <div>
-                <h3 class="text-white font-semibold mb-3">Analysis</h3>
-                <div id="chartsGrid" class="grid lg:grid-cols-2 gap-5"></div>
+            <div class="fade-in" style="animation-delay: 0.15s">
+                <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    Analysis
+                </h3>
+                <div id="chartsGrid" class="grid lg:grid-cols-2 gap-6"></div>
             </div>
             
             <!-- Insights Section -->
-            <div class="glass-panel rounded-2xl p-5">
-                <h3 class="text-white font-semibold mb-4">Observations</h3>
+            <div class="glass-card p-6 fade-in" style="animation-delay: 0.2s">
+                <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    Observations
+                </h3>
                 <div id="insightsList" class="space-y-3"></div>
             </div>
             
             <!-- Data Preview -->
-            <div class="glass-panel rounded-2xl p-5 overflow-x-auto">
-                <h3 class="text-white font-semibold mb-3">Data preview</h3>
+            <div class="glass-card p-6 overflow-x-auto fade-in" style="animation-delay: 0.25s">
+                <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 3v3m8-3v3M4 10h16M4 14h16"/>
+                    </svg>
+                    Data preview
+                </h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead id="previewHeader" class="text-slate-400 border-b border-white/10"></thead>
@@ -314,7 +476,7 @@
         </div>
         
         <!-- Footer -->
-        <div class="mt-12 pt-6 border-t border-white/10 text-center text-slate-500 text-xs">
+        <div class="mt-12 pt-6 border-t border-white/10 text-center text-slate-500 text-xs fade-in" style="animation-delay: 0.3s">
             <p>data storytelling platform · automated insights</p>
         </div>
     </div>
@@ -331,19 +493,17 @@
         
         let currentDownloadData = null;
         
-        // Format numbers
         const formatNumber = (num) => {
             if (num === undefined || num === null) return '--';
             return new Intl.NumberFormat().format(num);
         };
         
-        // Title case
         const toTitleCase = (str) => {
             if (!str) return '';
             return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         };
         
-        // Drag and drop handlers
+        // Drag and drop
         ['dragenter', 'dragover'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -390,7 +550,6 @@
             const formData = new FormData();
             formData.append('file', file);
             
-            // Show loading, hide others
             loadingState.classList.remove('hidden');
             dashboard.classList.add('hidden');
             errorState.classList.add('hidden');
@@ -410,6 +569,7 @@
                 renderDashboard(data);
                 loadingState.classList.add('hidden');
                 dashboard.classList.remove('hidden');
+                dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
             } catch (err) {
                 showError(err.message);
@@ -429,23 +589,24 @@
             const summary = data.summary;
             currentDownloadData = data.download_url;
             
-            // Quality cards
             document.getElementById('qualityScore').textContent = summary.quality_score || '--';
             document.getElementById('duplicatesRemoved').textContent = formatNumber(summary.duplicates_removed);
             document.getElementById('missingFixed').textContent = formatNumber(summary.before.missing - summary.after.missing);
             document.getElementById('recordCount').textContent = formatNumber(summary.after.rows);
             
-            // Before/after stats
             document.getElementById('beforeStatsText').innerHTML = `${formatNumber(summary.before.rows)} rows · ${formatNumber(summary.before.columns)} cols · ${formatNumber(summary.before.missing)} missing`;
             document.getElementById('afterStatsText').innerHTML = `${formatNumber(summary.after.rows)} rows · ${formatNumber(summary.after.columns)} cols · ${formatNumber(summary.after.missing)} missing`;
             
             // KPIs
             if (data.kpis && data.kpis.length) {
                 document.getElementById('kpiGrid').innerHTML = data.kpis.map(kpi => `
-                    <div class="glass-card rounded-xl p-3">
-                        <p class="text-slate-400 text-xs">${toTitleCase(kpi.label)}</p>
-                        <p class="text-white text-lg font-bold mt-1">${kpi.value}</p>
-                        <p class="text-slate-500 text-xs mt-1">${kpi.change >= 0 ? '↑' : '↓'} ${Math.abs(kpi.change)}% trend</p>
+                    <div class="glass-card p-4">
+                        <p class="text-slate-400 text-xs uppercase tracking-wider">${toTitleCase(kpi.label)}</p>
+                        <p class="text-white text-xl font-bold mt-2">${kpi.value}</p>
+                        <p class="text-slate-500 text-xs mt-2 flex items-center gap-1">
+                            <span class="${kpi.change >= 0 ? 'text-emerald-400' : 'text-red-400'}">${kpi.change >= 0 ? '↑' : '↓'}</span>
+                            <span>${Math.abs(kpi.change)}% trend</span>
+                        </p>
                     </div>
                 `).join('');
             }
@@ -456,29 +617,32 @@
                 chartsContainer.innerHTML = '';
                 
                 data.charts.forEach((chart, idx) => {
-                    const chartId = `chart_${idx}`;
+                    const chartId = `chart_${Date.now()}_${idx}`;
                     const card = document.createElement('div');
-                    card.className = 'glass-card rounded-xl p-4';
+                    card.className = 'glass-card p-5';
                     card.innerHTML = `
                         <div class="flex items-center justify-between mb-3">
-                            <p class="text-slate-400 text-xs uppercase tracking-wide">${chart.type}</p>
-                            <button data-download="${chartId}" class="text-slate-500 hover:text-slate-300 text-xs transition-colors">↗ export</button>
+                            <p class="text-slate-400 text-xs uppercase tracking-wider">${chart.type}</p>
+                            <button data-download="${chartId}" class="text-slate-500 hover:text-slate-300 text-xs transition-colors flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                export
+                            </button>
                         </div>
                         <h4 class="text-white font-medium text-sm mb-3">${chart.title}</h4>
                         <div id="${chartId}" class="chart-wrapper"></div>
-                        <p class="text-slate-400 text-xs mt-3 italic">${chart.insight || 'Relationship analysis based on data patterns.'}</p>
+                        <p class="text-slate-400 text-xs mt-4 italic">${chart.insight || 'Relationship analysis based on data patterns.'}</p>
                     `;
                     chartsContainer.appendChild(card);
                     
-                    // Render chart
                     if (chart.figure) {
                         Plotly.newPlot(chartId, chart.figure.data, chart.figure.layout, {
                             responsive: true,
-                            displayModeBar: true,
+                            displayModeBar: false,
                             displaylogo: false
                         });
                         
-                        // Download handler
                         const btn = card.querySelector(`[data-download="${chartId}"]`);
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
@@ -503,9 +667,9 @@
                 };
                 
                 document.getElementById('insightsList').innerHTML = data.insights.map(insight => `
-                    <div class="bg-white/5 rounded-lg p-4">
+                    <div class="bg-white/5 rounded-xl p-4 transition-all hover:bg-white/10">
                         <div class="flex items-start gap-3">
-                            <span class="text-lg">${icons[insight.icon] || '💡'}</span>
+                            <span class="text-xl">${icons[insight.icon] || '💡'}</span>
                             <div>
                                 <p class="text-white font-medium text-sm">${insight.title}</p>
                                 <p class="text-slate-400 text-sm mt-1 leading-relaxed">${insight.content}</p>
@@ -515,23 +679,22 @@
                 `).join('');
             }
             
-            // Preview table
+            // Preview
             if (data.preview && data.preview.columns && data.preview.rows) {
                 document.getElementById('previewHeader').innerHTML = `
                     <tr>
-                        ${data.preview.columns.map(col => `<th class="text-left py-2 px-3">${toTitleCase(col)}</th>`).join('')}
+                        ${data.preview.columns.map(col => `<th class="text-left py-3 px-3 text-xs font-medium">${toTitleCase(col)}</th>`).join('')}
                     </tr>
                 `;
                 
                 document.getElementById('previewBody').innerHTML = data.preview.rows.slice(0, 8).map(row => `
                     <tr class="border-b border-white/5">
-                        ${row.map(cell => `<td class="py-2 px-3 text-sm">${String(cell).substring(0, 40)}${String(cell).length > 40 ? '...' : ''}</td>`).join('')}
+                        ${row.map(cell => `<td class="py-3 px-3 text-sm text-slate-300">${String(cell).substring(0, 50)}${String(cell).length > 50 ? '...' : ''}</td>`).join('')}
                     </tr>
                 `).join('');
             }
         }
         
-        // Download handler
         document.getElementById('downloadBtn').addEventListener('click', () => {
             if (currentDownloadData) {
                 const link = document.createElement('a');
