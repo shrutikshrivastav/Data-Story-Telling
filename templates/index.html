@@ -2,12 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>Narravault AI Data Storytelling</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
@@ -23,30 +21,24 @@
     }
   </script>
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      background:
-        radial-gradient(circle at 12% 8%, rgba(20,184,166,.20), transparent 24rem),
-        radial-gradient(circle at 84% 12%, rgba(99,102,241,.24), transparent 24rem),
-        linear-gradient(135deg, #020617 0%, #07111f 48%, #0b1020 100%);
+      background: radial-gradient(circle at 12% 8%, rgba(20,184,166,.20), transparent 24rem),
+                  radial-gradient(circle at 84% 12%, rgba(99,102,241,.24), transparent 24rem),
+                  linear-gradient(135deg, #020617 0%, #07111f 48%, #0b1020 100%);
+      min-height: 100vh;
     }
     .glass {
       background: linear-gradient(145deg, rgba(15,23,42,.78), rgba(15,23,42,.48));
       border: 1px solid rgba(148,163,184,.22);
-      box-shadow: 0 24px 80px rgba(0,0,0,.38);
       backdrop-filter: blur(22px);
     }
-    .soft-grid {
-      background-image:
-        linear-gradient(rgba(148,163,184,.08) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148,163,184,.08) 1px, transparent 1px);
-      background-size: 42px 42px;
-      mask-image: linear-gradient(to bottom, rgba(0,0,0,.95), rgba(0,0,0,.16));
+    .drop-active { 
+      border-color: #38bdf8 !important; 
+      background: rgba(14,165,233,.12) !important; 
+      transform: scale(1.01);
     }
-    .phase-pill { background: rgba(15,23,42,.78); border: 1px solid rgba(148,163,184,.22); }
-    .drop-active { border-color: #38bdf8; background: rgba(14,165,233,.12); transform: scale(1.01); }
-    .chart-card { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
-    .chart-card:hover { transform: translateY(-4px); border-color: rgba(56,189,248,.5); box-shadow: 0 28px 90px rgba(14,165,233,.14); }
     .loader {
       width: 46px; height: 46px; border-radius: 999px;
       border: 3px solid rgba(148,163,184,.26); border-top-color: #38bdf8;
@@ -55,17 +47,35 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
     .rise { animation: rise .55s ease both; }
+    
+    /* Fixed chart container - no overflow */
+    .chart-container {
+      position: relative;
+      width: 100%;
+      min-height: 450px;
+      overflow: hidden;
+    }
+    .chart-container .js-plotly-plot,
+    .chart-container .plotly {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(15,23,42,.6); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb { background: rgba(56,189,248,.4); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(56,189,248,.7); }
   </style>
 </head>
-<body class="min-h-screen text-slate-100 font-sans">
-  <div class="soft-grid fixed inset-0 pointer-events-none"></div>
-
+<body>
   <main class="relative mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 lg:py-9">
+    <!-- Header -->
     <nav class="flex items-center justify-between gap-4 mb-8">
       <div class="flex items-center gap-3">
         <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-400 via-cyan-300 to-emerald-300 p-[1px] shadow-glow">
           <div class="h-full w-full rounded-2xl bg-slate-950 flex items-center justify-center">
-            <svg viewBox="0 0 42 42" class="h-8 w-8" fill="none" aria-hidden="true">
+            <svg viewBox="0 0 42 42" class="h-8 w-8" fill="none">
               <path d="M8 28V14l13-7 13 7v14l-13 7-13-7Z" stroke="#67e8f9" stroke-width="2.6"/>
               <path d="M14 26V16M21 29V12M28 25v-7" stroke="#a7f3d0" stroke-width="3" stroke-linecap="round"/>
             </svg>
@@ -77,27 +87,33 @@
         </div>
       </div>
       <div class="hidden md:flex items-center gap-2 text-sm text-slate-300">
-        <span class="phase-pill rounded-full px-4 py-2">DATA</span>
-        <span class="phase-pill rounded-full px-4 py-2">VISUALIZATION</span>
-        <span class="phase-pill rounded-full px-4 py-2">NARRATIVE</span>
+        <span class="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2">DATA</span>
+        <span class="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2">VISUALIZATION</span>
+        <span class="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2">NARRATIVE</span>
       </div>
     </nav>
 
+    <!-- Hero + Upload -->
     <section class="grid lg:grid-cols-[1.04fr_.96fr] gap-6 lg:gap-8 items-stretch mb-8">
       <div class="py-6 lg:py-12">
         <p class="inline-flex items-center rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm text-cyan-100 mb-6">
-          Local AI-style analytics, no external AI APIs
+          ⚡ AI-Powered Analytics Engine
         </p>
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight tracking-tight">
-          Turn raw spreadsheets into executive data stories.
+          Turn raw spreadsheets into<br/>executive data stories.
         </h1>
         <p class="mt-5 max-w-2xl text-base sm:text-lg text-slate-300 leading-8">
-          Upload CSV or Excel files and get automated cleaning, interactive Plotly dashboards, downloadable charts, KPI signals, and analyst-style narratives powered entirely by Python logic.
+          Upload CSV or Excel files and get automated cleaning, interactive dashboards, downloadable charts, KPI signals, and analyst-style narratives powered entirely by Python logic.
         </p>
+        <div class="mt-6 flex gap-3 text-sm text-slate-400">
+          <span>✅ No data stored</span>
+          <span>⚡ Fast processing</span>
+          <span>📊 6+ chart types</span>
+        </div>
       </div>
 
       <form id="uploadForm" class="glass rounded-[28px] p-5 sm:p-7 self-center" enctype="multipart/form-data">
-        <label id="dropZone" class="group flex min-h-[290px] cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-slate-500/35 bg-slate-950/35 p-7 text-center transition">
+        <label id="dropZone" class="group flex min-h-[290px] cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-slate-500/35 bg-slate-950/35 p-7 text-center transition-all duration-300">
           <input id="fileInput" name="file" type="file" accept=".csv,.xlsx,.xls" class="hidden" />
           <div class="mb-5 rounded-3xl bg-gradient-to-br from-sky-400/20 to-emerald-300/20 p-5 ring-1 ring-white/10 transition group-hover:scale-105">
             <svg class="h-12 w-12 text-cyan-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -107,81 +123,91 @@
           </div>
           <p class="text-xl font-bold">Drop your dataset here</p>
           <p id="fileName" class="mt-2 text-sm text-slate-400">CSV, XLSX, or XLS up to 32MB</p>
-          <button type="submit" class="mt-7 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-300 to-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-glow transition hover:scale-[1.02]">
-            Generate Data Story
+          <button type="submit" class="mt-7 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-300 to-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-glow transition hover:scale-[1.02] active:scale-95">
+            🚀 Generate Data Story
           </button>
         </label>
       </form>
     </section>
 
+    <!-- Loading -->
     <section id="loading" class="hidden glass rounded-[28px] p-8 mb-8 text-center">
       <div class="loader mx-auto mb-4"></div>
       <p class="text-lg font-bold">Analyzing, cleaning, charting, and writing the story...</p>
-      <p class="text-sm text-slate-400 mt-2">The full workflow runs locally in the Flask backend.</p>
+      <p id="processingTime" class="text-sm text-slate-400 mt-2"></p>
     </section>
 
+    <!-- Error -->
     <section id="errorBox" class="hidden rounded-3xl border border-rose-400/30 bg-rose-500/10 p-5 text-rose-100 mb-8"></section>
 
+    <!-- Dashboard -->
     <section id="dashboard" class="hidden space-y-8">
+      <!-- Quality Section -->
       <div class="glass rounded-[28px] p-5 sm:p-7">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
           <div>
-            <p class="text-sm uppercase tracking-[0.3em] text-cyan-200/70">DATA PHASE</p>
-            <h2 class="text-2xl sm:text-3xl font-black mt-2">Cleaned Dataset Quality</h2>
+            <p class="text-sm uppercase tracking-[0.3em] text-cyan-200/70">DATA QUALITY</p>
+            <h2 class="text-2xl sm:text-3xl font-black mt-2">Cleaned Dataset Report</h2>
           </div>
-          <button id="downloadCleaned" class="rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-100 hover:bg-cyan-300/20 transition">
-            Download Cleaned CSV
+          <button id="downloadCleaned" class="rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-bold text-cyan-100 hover:bg-cyan-300/20 transition-all">
+            📥 Download Cleaned CSV
           </button>
         </div>
         <div id="qualityCards" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
         <div class="grid lg:grid-cols-2 gap-4 mt-5">
           <div class="rounded-3xl border border-white/10 bg-slate-950/35 p-5">
-            <h3 class="font-bold mb-4">Before Cleaning</h3>
+            <h3 class="font-bold mb-4">📊 Before Cleaning</h3>
             <div id="beforeStats" class="grid grid-cols-3 gap-3"></div>
           </div>
           <div class="rounded-3xl border border-white/10 bg-slate-950/35 p-5">
-            <h3 class="font-bold mb-4">After Cleaning</h3>
+            <h3 class="font-bold mb-4">✨ After Cleaning</h3>
             <div id="afterStats" class="grid grid-cols-3 gap-3"></div>
           </div>
         </div>
+        <div id="timeInfo" class="mt-4 text-center text-sm text-slate-400"></div>
       </div>
 
+      <!-- KPIs -->
       <div class="glass rounded-[28px] p-5 sm:p-7">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between mb-6">
           <div>
-            <p class="text-sm uppercase tracking-[0.3em] text-emerald-200/70">KPI LAYER</p>
+            <p class="text-sm uppercase tracking-[0.3em] text-emerald-200/70">KPI DASHBOARD</p>
             <h2 class="text-2xl sm:text-3xl font-black mt-2">Executive Signals</h2>
           </div>
-          <p id="fileBadge" class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 w-fit"></p>
+          <p id="fileBadge" class="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300"></p>
         </div>
         <div id="kpiCards" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
       </div>
 
+      <!-- Charts -->
       <div class="glass rounded-[28px] p-5 sm:p-7">
         <div class="mb-6">
-          <p class="text-sm uppercase tracking-[0.3em] text-violet-200/70">VISUALIZATION PHASE</p>
-          <h2 class="text-2xl sm:text-3xl font-black mt-2">Interactive Visual Analytics</h2>
+          <p class="text-sm uppercase tracking-[0.3em] text-violet-200/70">VISUAL ANALYTICS</p>
+          <h2 class="text-2xl sm:text-3xl font-black mt-2">Interactive Charts</h2>
+          <p class="text-slate-400 text-sm mt-1">Click on any chart to focus | Hover for details | Download as PNG</p>
         </div>
-        <div id="charts" class="grid xl:grid-cols-2 gap-5"></div>
+        <div id="charts" class="grid xl:grid-cols-2 gap-6"></div>
       </div>
 
+      <!-- Narrative -->
       <div class="glass rounded-[28px] p-5 sm:p-7">
         <div class="mb-6">
-          <p class="text-sm uppercase tracking-[0.3em] text-amber-200/70">NARRATIVE PHASE</p>
-          <h2 class="text-2xl sm:text-3xl font-black mt-2">Business Analyst Story</h2>
+          <p class="text-sm uppercase tracking-[0.3em] text-amber-200/70">BUSINESS STORY</p>
+          <h2 class="text-2xl sm:text-3xl font-black mt-2">AI-Generated Insights</h2>
         </div>
         <div id="insights" class="grid lg:grid-cols-2 gap-4"></div>
       </div>
 
-      <div class="glass rounded-[28px] p-5 sm:p-7 overflow-hidden">
+      <!-- Preview -->
+      <div class="glass rounded-[28px] p-5 sm:p-7 overflow-x-auto">
         <div class="mb-5">
           <p class="text-sm uppercase tracking-[0.3em] text-slate-300/70">DATA PREVIEW</p>
-          <h2 class="text-2xl font-black mt-2">Cleaned Sample Rows</h2>
+          <h2 class="text-2xl font-black mt-2">First 10 Rows (Cleaned)</h2>
         </div>
         <div class="overflow-x-auto">
           <table class="min-w-full text-sm">
-            <thead id="previewHead" class="text-left text-slate-300"></thead>
-            <tbody id="previewBody" class="divide-y divide-white/10 text-slate-200"></tbody>
+            <thead id="previewHead" class="text-left text-slate-300 border-b border-white/10"></thead>
+            <tbody id="previewBody" class="divide-y divide-white/10"></tbody>
           </table>
         </div>
       </div>
@@ -196,100 +222,132 @@
     const loading = document.getElementById('loading');
     const dashboard = document.getElementById('dashboard');
     const errorBox = document.getElementById('errorBox');
+    const processingTimeSpan = document.getElementById('processingTime');
+    const timeInfoDiv = document.getElementById('timeInfo');
     let cleanedCsvPayload = '';
 
     const fmt = (value) => new Intl.NumberFormat().format(value ?? 0);
     const titleize = (text) => String(text).replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
+    // File validation
     fileInput.addEventListener('change', () => {
-      fileName.textContent = fileInput.files[0] ? fileInput.files[0].name : 'CSV, XLSX, or XLS up to 32MB';
+      const file = fileInput.files[0];
+      if (file && file.size > 32 * 1024 * 1024) {
+        showError('File too large! Maximum 32MB allowed.');
+        fileInput.value = '';
+        fileName.textContent = 'CSV, XLSX, or XLS up to 32MB';
+      } else {
+        fileName.textContent = file ? file.name : 'CSV, XLSX, or XLS up to 32MB';
+      }
     });
 
+    // Drag & drop
     ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, event => {
-        event.preventDefault();
+      dropZone.addEventListener(eventName, e => {
+        e.preventDefault();
         dropZone.classList.add('drop-active');
       });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, event => {
-        event.preventDefault();
+      dropZone.addEventListener(eventName, e => {
+        e.preventDefault();
         dropZone.classList.remove('drop-active');
       });
     });
 
-    dropZone.addEventListener('drop', event => {
-      fileInput.files = event.dataTransfer.files;
-      fileName.textContent = fileInput.files[0]?.name || 'CSV, XLSX, or XLS up to 32MB';
+    dropZone.addEventListener('drop', e => {
+      const files = e.dataTransfer.files;
+      if (files[0] && files[0].size > 32 * 1024 * 1024) {
+        showError('File too large! Maximum 32MB allowed.');
+      } else {
+        fileInput.files = files;
+        fileName.textContent = files[0]?.name || 'CSV, XLSX, or XLS up to 32MB';
+      }
     });
 
+    // Form submission
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      
       if (window.location.protocol === 'file:') {
-        showError('Open this dashboard through Flask or Render, not as a local file. Use the live Render URL or run python app.py and visit http://127.0.0.1:5000.');
+        showError('Please run "python app.py" and visit http://127.0.0.1:5000');
         return;
       }
+      
       if (!fileInput.files.length) {
         showError('Please select a CSV or Excel file first.');
         return;
       }
+      
+      const file = fileInput.files[0];
+      if (file.size > 32 * 1024 * 1024) {
+        showError('File too large! Maximum 32MB allowed.');
+        return;
+      }
+      
       const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
+      formData.append('file', file);
+      
       loading.classList.remove('hidden');
       errorBox.classList.add('hidden');
       dashboard.classList.add('hidden');
-
+      processingTimeSpan.textContent = 'Processing your data...';
+      
+      const startTime = Date.now();
+      
       try {
         const response = await fetch('/upload', { method: 'POST', body: formData });
         const data = await response.json();
+        
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        processingTimeSpan.textContent = `Completed in ${elapsed} seconds`;
+        
         if (!response.ok) throw new Error(data.error || 'Upload failed.');
         renderDashboard(data);
       } catch (error) {
         showError(error.message);
-      } finally {
         loading.classList.add('hidden');
       }
     });
 
     function showError(message) {
-      errorBox.textContent = message;
+      errorBox.innerHTML = `<div class="flex items-center gap-3"><span class="text-2xl">⚠️</span><span>${message}</span></div>`;
       errorBox.classList.remove('hidden');
+      setTimeout(() => {
+        errorBox.classList.add('hidden');
+      }, 8000);
     }
 
     function metricCard(label, value, detail, accent = 'cyan') {
-      const accentClass = {
-        emerald: 'text-emerald-100',
-        cyan: 'text-cyan-100',
-        violet: 'text-violet-100',
-        amber: 'text-amber-100'
-      }[accent] || 'text-cyan-100';
+      const colors = { emerald: 'text-emerald-100', cyan: 'text-cyan-100', violet: 'text-violet-100', amber: 'text-amber-100' };
       return `
-        <div class="rise rounded-3xl border border-white/10 bg-white/[0.055] p-5 hover:bg-white/[0.08] transition">
+        <div class="rounded-3xl border border-white/10 bg-white/[0.055] p-5 hover:bg-white/[0.08] transition-all duration-300">
           <p class="text-xs uppercase tracking-[0.22em] text-slate-400">${label}</p>
-          <p class="mt-3 text-3xl font-black ${accentClass}">${value}</p>
+          <p class="mt-3 text-3xl font-black ${colors[accent] || 'text-cyan-100'}">${value}</p>
           <p class="mt-2 text-sm text-slate-400">${detail}</p>
         </div>`;
     }
 
     function smallStat(label, value) {
-      return `
-        <div class="rounded-2xl bg-slate-900/70 p-4">
-          <p class="text-xs text-slate-400">${label}</p>
-          <p class="mt-2 text-xl font-black">${value}</p>
-        </div>`;
+      return `<div class="rounded-2xl bg-slate-900/70 p-4"><p class="text-xs text-slate-400">${label}</p><p class="mt-2 text-xl font-black">${value}</p></div>`;
     }
 
     function renderDashboard(data) {
       cleanedCsvPayload = data.cleaned_csv;
       const s = data.summary;
+      
       document.getElementById('fileBadge').textContent = data.filename;
+      if (s.total_processing_time) {
+        timeInfoDiv.innerHTML = `⏱️ Total processing time: ${s.total_processing_time} seconds`;
+      }
 
+      // Quality cards
       document.getElementById('qualityCards').innerHTML = [
-        metricCard('Quality Score', `${s.quality_score}%`, 'Overall post-cleaning dataset reliability', 'emerald'),
-        metricCard('Duplicates Removed', fmt(s.duplicates_removed), 'Repeated rows eliminated', 'cyan'),
-        metricCard('Missing Fixed', fmt(s.missing_values_fixed), 'Null values imputed with safe defaults', 'violet'),
-        metricCard('Outliers Detected', fmt(s.outliers_detected), 'Unusual numeric values flagged', 'amber')
+        metricCard('Quality Score', `${s.quality_score}%`, 'Overall dataset reliability', 'emerald'),
+        metricCard('Duplicates', fmt(s.duplicates_removed), 'Repeated rows eliminated', 'cyan'),
+        metricCard('Missing Fixed', fmt(s.missing_values_fixed)), 'Null values imputed', 'violet'),
+        metricCard('Outliers', fmt(s.outliers_detected), 'Unusual values flagged', 'amber')
       ].join('');
 
       document.getElementById('beforeStats').innerHTML = [
@@ -297,22 +355,24 @@
         smallStat('Columns', fmt(s.before.columns)),
         smallStat('Missing', fmt(s.before.missing_values))
       ].join('');
+      
       document.getElementById('afterStats').innerHTML = [
         smallStat('Rows', fmt(s.after.rows)),
         smallStat('Columns', fmt(s.after.columns)),
         smallStat('Missing', fmt(s.after.missing_values))
       ].join('');
 
+      // KPIs
       document.getElementById('kpiCards').innerHTML = data.kpis.map(kpi => {
         const trendClass = kpi.trend >= 0 ? 'text-emerald-300' : 'text-rose-300';
-        const arrow = kpi.trend >= 0 ? '+' : '-';
+        const arrow = kpi.trend >= 0 ? '↑' : '↓';
         return `
-          <div class="rise rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.035] p-5">
+          <div class="rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.035] p-5 transition-all hover:scale-[1.02]">
             <p class="text-sm text-slate-400">${titleize(kpi.label)}</p>
             <p class="mt-3 text-3xl font-black">${kpi.value}</p>
             <div class="mt-4 flex items-center justify-between gap-3">
               <p class="text-sm text-slate-400">${kpi.detail}</p>
-              <span class="${trendClass} text-sm font-black">${arrow}${Math.abs(kpi.trend)}%</span>
+              <span class="${trendClass} text-sm font-black">${arrow} ${Math.abs(kpi.trend)}%</span>
             </div>
           </div>`;
       }).join('');
@@ -320,56 +380,96 @@
       renderCharts(data.charts);
       renderInsights(data.narrative);
       renderPreview(data.preview);
-
+      
       dashboard.classList.remove('hidden');
+      loading.classList.add('hidden');
       dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     function renderCharts(charts) {
       const container = document.getElementById('charts');
-      container.innerHTML = charts.map(chart => `
-        <article class="chart-card rounded-3xl border border-white/10 bg-slate-950/35 p-4 sm:p-5 cursor-pointer" data-chart-card="${chart.id}">
+      if (!charts || charts.length === 0) {
+        container.innerHTML = '<div class="col-span-2 text-center p-8 text-slate-400">No charts available for this dataset</div>';
+        return;
+      }
+      
+      container.innerHTML = charts.map((chart, idx) => `
+        <div class="chart-card rounded-3xl border border-white/10 bg-slate-950/35 p-4 transition-all duration-300 hover:border-cyan-300/30" data-chart-id="${chart.id}">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <div>
               <p class="text-xs uppercase tracking-[0.24em] text-violet-200/70">${chart.type}</p>
               <h3 class="mt-1 text-xl font-black">${chart.title}</h3>
             </div>
-            <button type="button" data-download="${chart.id}" class="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-300/20 transition">
-              Download
+            <button data-download="${chart.id}" class="download-chart-btn rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100 hover:bg-cyan-300/20 transition-all">
+              📸 Download PNG
             </button>
           </div>
-          <div id="${chart.id}" class="h-[430px] w-full"></div>
-          <p class="mt-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-sm leading-6 text-slate-300">${chart.explanation}</p>
-        </article>
+          <div id="${chart.id}" class="chart-container" style="min-height: 450px; width: 100%;"></div>
+          <p class="mt-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 text-sm leading-6 text-slate-300">💡 ${chart.explanation}</p>
+        </div>
       `).join('');
 
+      // Render each chart
       charts.forEach(chart => {
-        Plotly.newPlot(chart.id, chart.figure.data, chart.figure.layout, chart.config);
-        document.querySelector(`[data-chart-card="${chart.id}"]`).addEventListener('click', event => {
-          if (event.target.dataset.download) return;
-          document.getElementById(chart.id).scrollIntoView({ behavior: 'smooth', block: 'center' });
-          Plotly.Fx.hover(chart.id, [{ curveNumber: 0, pointNumber: 0 }]);
-        });
-        document.querySelector(`[data-download="${chart.id}"]`).addEventListener('click', () => {
-          Plotly.downloadImage(chart.id, { format: 'png', filename: `${chart.title.replaceAll(' ', '_').toLowerCase()}`, scale: 2 });
-        });
+        try {
+          if (chart.figure && chart.figure.data) {
+            Plotly.newPlot(chart.id, chart.figure.data, chart.figure.layout, {
+              ...chart.config,
+              responsive: true,
+              displayModeBar: true
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+              Plotly.relayout(chart.id, { autosize: true });
+            });
+          }
+        } catch (err) {
+          console.error(`Chart ${chart.id} error:`, err);
+          document.getElementById(chart.id).innerHTML = '<div class="text-red-400 p-8 text-center">⚠️ Chart rendering error</div>';
+        }
+        
+        // Download button handler
+        const downloadBtn = document.querySelector(`[data-download="${chart.id}"]`);
+        if (downloadBtn) {
+          downloadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            Plotly.downloadImage(chart.id, { 
+              format: 'png', 
+              filename: chart.title.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              scale: 2 
+            });
+          });
+        }
       });
     }
 
     function renderInsights(insights) {
-      document.getElementById('insights').innerHTML = insights.map((insight, index) => `
-        <article class="rise rounded-3xl border border-white/10 bg-white/[0.055] p-5" style="animation-delay:${index * 70}ms">
+      const container = document.getElementById('insights');
+      if (!insights || insights.length === 0) {
+        container.innerHTML = '<div class="col-span-2 text-center p-8 text-slate-400">No insights generated</div>';
+        return;
+      }
+      
+      container.innerHTML = insights.map((insight, idx) => `
+        <div class="rounded-3xl border border-white/10 bg-white/[0.055] p-5 transition-all hover:scale-[1.01] hover:border-cyan-300/20" style="animation: rise 0.55s ease both ${idx * 0.1}s">
           <div class="mb-4 h-1.5 w-20 rounded-full bg-gradient-to-r from-amber-300 to-cyan-300"></div>
           <h3 class="text-xl font-black">${insight.title}</h3>
           <p class="mt-3 text-sm sm:text-base leading-7 text-slate-300">${insight.body}</p>
-        </article>
+        </div>
       `).join('');
     }
 
     function renderPreview(preview) {
+      if (!preview.columns || preview.columns.length === 0) {
+        document.getElementById('previewHead').innerHTML = '<tr><th>No data</th></tr>';
+        document.getElementById('previewBody').innerHTML = '<tr><td>No preview available</td></tr>';
+        return;
+      }
+      
       document.getElementById('previewHead').innerHTML = `<tr>${preview.columns.map(col => `<th class="px-4 py-3 font-bold">${titleize(col)}</th>`).join('')}</tr>`;
       document.getElementById('previewBody').innerHTML = preview.rows.map(row => `
-        <tr>${row.map(cell => `<td class="px-4 py-3 whitespace-nowrap">${cell}</td>`).join('')}</tr>
+        <tr>${row.map(cell => `<td class="px-4 py-3 whitespace-nowrap" title="${cell}">${String(cell).substring(0, 50)}${String(cell).length > 50 ? '...' : ''}</td>`).join('')}</tr>
       `).join('');
     }
 
@@ -377,7 +477,7 @@
       if (!cleanedCsvPayload) return;
       const link = document.createElement('a');
       link.href = `data:text/csv;base64,${cleanedCsvPayload}`;
-      link.download = 'cleaned_data_story.csv';
+      link.download = 'cleaned_data.csv';
       link.click();
     });
   </script>
