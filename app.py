@@ -3,7 +3,7 @@ import io
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -86,7 +86,7 @@ def coerce_datatypes(df):
                 converted[column] = numeric_candidate
                 continue
 
-            date_candidate = pd.to_datetime(converted[column], errors="coerce", infer_datetime_format=True)
+            date_candidate = pd.to_datetime(converted[column], errors="coerce")
             date_ratio = date_candidate.notna().mean()
             unique_dates = date_candidate.dropna().dt.date.nunique()
             if date_ratio >= 0.72 and unique_dates >= 2:
@@ -112,7 +112,7 @@ def fill_missing_values(df):
             filled[column] = filled[column].fillna(0 if pd.isna(median) else median)
         elif pd.api.types.is_datetime64_any_dtype(filled[column]):
             mode = filled[column].mode(dropna=True)
-            replacement = mode.iloc[0] if not mode.empty else pd.Timestamp(datetime.utcnow().date())
+            replacement = mode.iloc[0] if not mode.empty else pd.Timestamp(datetime.now(timezone.utc).date())
             filled[column] = filled[column].fillna(replacement)
         else:
             mode = filled[column].mode(dropna=True)
@@ -224,7 +224,7 @@ def generate_visualizations(df, summary):
         timeline[date_col] = pd.to_datetime(timeline[date_col], errors="coerce")
         timeline = timeline.dropna().sort_values(date_col)
         if not timeline.empty:
-            grain = "M" if timeline[date_col].dt.date.nunique() > 40 else "D"
+            grain = "ME" if timeline[date_col].dt.date.nunique() > 40 else "D"
             trend = timeline.groupby(pd.Grouper(key=date_col, freq=grain))[val].sum().reset_index()
             fig = px.line(trend, x=date_col, y=val, markers=True, title=f"{val} Trend Over Time")
             fig.update_traces(line={"color": "#38bdf8", "width": 4}, marker={"size": 8})
@@ -391,7 +391,7 @@ def generate_narrative(df, summary):
         timeline[date_col] = pd.to_datetime(timeline[date_col], errors="coerce")
         timeline = timeline.dropna().sort_values(date_col)
         if len(timeline) >= 3:
-            monthly = timeline.groupby(pd.Grouper(key=date_col, freq="M"))[val].sum().dropna()
+            monthly = timeline.groupby(pd.Grouper(key=date_col, freq="ME"))[val].sum().dropna()
             if len(monthly) >= 2:
                 growth = (monthly.iloc[-1] - monthly.iloc[0]) / abs(monthly.iloc[0]) * 100 if monthly.iloc[0] else 0
                 direction = "expanded" if growth >= 0 else "contracted"
@@ -508,6 +508,11 @@ def upload():
     except Exception as exc:
         app.logger.exception("Upload processing failed")
         return jsonify({"error": f"Unable to process this file: {exc}"}), 500
+
+
+@app.errorhandler(413)
+def file_too_large(_error):
+    return jsonify({"error": "The uploaded file is too large. Please upload a file up to 32MB."}), 413
 
 
 if __name__ == "__main__":
