@@ -7,36 +7,51 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white min-h-screen flex flex-col items-center justify-center p-6">
+<body class="bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white min-h-screen p-6">
 
-  <div class="w-full max-w-6xl">
-    <h1 class="text-4xl font-bold text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">AI-Powered Data Storytelling</h1>
+  <!-- Logo -->
+  <div class="text-center mb-8">
+    <h1 class="text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 drop-shadow-lg">
+      📊 DataStory AI
+    </h1>
+    <p class="text-gray-400 mt-2">Premium Analytics & Storytelling Dashboard</p>
+  </div>
 
-    <!-- Upload Section -->
-    <div class="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center backdrop-blur-md bg-white/5 hover:bg-white/10 transition">
-      <input type="file" id="fileInput" class="hidden" />
-      <label for="fileInput" class="cursor-pointer text-lg font-semibold text-gray-300 hover:text-white">Drag & Drop or Click to Upload CSV/Excel</label>
+  <!-- Upload -->
+  <div class="border-2 border-dashed border-gray-600 rounded-xl p-10 text-center backdrop-blur-md bg-white/5 hover:bg-white/10 transition">
+    <input type="file" id="fileInput" class="hidden" />
+    <label for="fileInput" class="cursor-pointer text-lg font-semibold text-gray-300 hover:text-white">Drag & Drop or Click to Upload CSV/Excel</label>
+  </div>
+
+  <!-- Download -->
+  <div id="downloadSection" class="hidden mt-4 text-center">
+    <button id="downloadBtn" class="px-6 py-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg shadow-lg hover:scale-105 transition">Download Cleaned Data</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="mt-10 space-y-10 hidden">
+    <div id="dataPhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
+      <h2 class="text-2xl font-bold mb-4">📊 Data Quality Summary</h2>
+      <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-3 gap-6"></div>
     </div>
-
-    <!-- Download Button -->
-    <div id="downloadSection" class="hidden mt-4 text-center">
-      <button id="downloadBtn" class="px-6 py-2 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg shadow-lg hover:scale-105 transition">Download Cleaned Data</button>
+    <div id="vizPhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
+      <h2 class="text-2xl font-bold mb-4">📈 Visualizations</h2>
+      <div id="visualizations" class="space-y-6"></div>
     </div>
+    <div id="narrativePhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
+      <h2 class="text-2xl font-bold mb-4">📝 Narrative Insights</h2>
+      <ul id="narrative" class="list-disc pl-6 space-y-2"></ul>
+    </div>
+  </div>
 
-    <!-- Dashboard Sections -->
-    <div id="dashboard" class="mt-10 space-y-10 hidden">
-      <!-- Data Phase -->
-      <div id="dataPhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
-        <h2 class="text-2xl font-bold mb-4">📊 Data Quality Summary</h2>
-        <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-3 gap-6"></div>
-      </div>
+<script>
+const fileInput=document.getElementById("fileInput");
+const dashboard=document.getElementById("dashboard");
+const summaryCards=document.getElementById("summaryCards");
+const visualizations=document.getElementById("visualizations");
+const narrative=document.getElementById("narrative");
+const downloadSection=document.getElementById("downloadSection");
+const downloadBtn=document.getElementById("downloadBtn");
 
-      <!-- Visualization Phase -->
-      <div id="vizPhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
-        <h2 class="text-2xl font-bold mb-4">📈 Visualizations</h2>
-        <div id="visualizations" class="space-y-6"></div>
-      </div>
-
-      <!-- Narrative Phase -->
-      <div id="narrativePhase" class="p-6 rounded-xl bg-white/10 backdrop-blur-md shadow-lg">
-        <h2 class="text-2xl font-bold mb-4">
+fileInput.addEventListener("change",async()=>{
+  const file=fileInput.files[
