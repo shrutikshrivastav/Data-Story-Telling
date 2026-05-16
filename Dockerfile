@@ -9,4 +9,5 @@ COPY . .
 
 ENV PORT=5000
 
-CMD ["gunicorn", "-b", "0.0.0.0:$PORT", "app:app"]
+# Shell form so $PORT expands correctly
+CMD gunicorn -b 0.0.0.0:$PORT app:app
