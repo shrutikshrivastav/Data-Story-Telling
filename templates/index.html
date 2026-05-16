@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Data Storyteller | Narrative Intelligence</title>
+    <title>Data Storyteller | Narrative Intelligence Platform</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -124,27 +124,6 @@
             border-color: rgba(59, 130, 246, 0.3);
             background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
             box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Gradient borders */
-        .gradient-border {
-            position: relative;
-            background: rgba(15, 25, 45, 0.6);
-            border-radius: 28px;
-        }
-        
-        .gradient-border::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 28px;
-            padding: 1px;
-            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.3), rgba(6,182,212,0.3));
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
         }
         
         /* Drop zone */
@@ -446,15 +425,15 @@
                 <div id="chartsGrid" class="grid lg:grid-cols-2 gap-6"></div>
             </div>
             
-            <!-- Insights Section -->
+            <!-- Narrative Insights Section (Matches generate_narrative from app.py) -->
             <div class="glass-card p-6 fade-in" style="animation-delay: 0.2s">
                 <h3 class="text-white font-semibold mb-4 flex items-center gap-2">
                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                     </svg>
-                    Observations
+                    Narrative Insights
                 </h3>
-                <div id="insightsList" class="space-y-3"></div>
+                <div id="narrativeList" class="space-y-4"></div>
             </div>
             
             <!-- Data Preview -->
@@ -464,7 +443,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 3v3m8-3v3M4 10h16M4 14h16"/>
                     </svg>
-                    Data preview
+                    Data preview (cleaned)
                 </h3>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -501,6 +480,19 @@
         const toTitleCase = (str) => {
             if (!str) return '';
             return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        };
+        
+        // Tone-based styling for narrative
+        const getToneStyle = (tone) => {
+            const styles = {
+                quality: 'border-l-4 border-emerald-500 bg-emerald-500/5',
+                performance: 'border-l-4 border-blue-500 bg-blue-500/5',
+                trend: 'border-l-4 border-cyan-500 bg-cyan-500/5',
+                correlation: 'border-l-4 border-purple-500 bg-purple-500/5',
+                segment: 'border-l-4 border-amber-500 bg-amber-500/5',
+                risk: 'border-l-4 border-rose-500 bg-rose-500/5'
+            };
+            return styles[tone] || 'border-l-4 border-slate-500 bg-white/5';
         };
         
         // Drag and drop
@@ -587,15 +579,17 @@
         
         function renderDashboard(data) {
             const summary = data.summary;
-            currentDownloadData = data.download_url;
+            currentDownloadData = data.cleaned_csv;
             
+            // Quality cards
             document.getElementById('qualityScore').textContent = summary.quality_score || '--';
             document.getElementById('duplicatesRemoved').textContent = formatNumber(summary.duplicates_removed);
-            document.getElementById('missingFixed').textContent = formatNumber(summary.before.missing - summary.after.missing);
+            document.getElementById('missingFixed').textContent = formatNumber(summary.missing_values_fixed);
             document.getElementById('recordCount').textContent = formatNumber(summary.after.rows);
             
-            document.getElementById('beforeStatsText').innerHTML = `${formatNumber(summary.before.rows)} rows · ${formatNumber(summary.before.columns)} cols · ${formatNumber(summary.before.missing)} missing`;
-            document.getElementById('afterStatsText').innerHTML = `${formatNumber(summary.after.rows)} rows · ${formatNumber(summary.after.columns)} cols · ${formatNumber(summary.after.missing)} missing`;
+            // Before/after stats
+            document.getElementById('beforeStatsText').innerHTML = `${formatNumber(summary.before.rows)} rows · ${formatNumber(summary.before.columns)} cols · ${formatNumber(summary.before.missing_values)} missing`;
+            document.getElementById('afterStatsText').innerHTML = `${formatNumber(summary.after.rows)} rows · ${formatNumber(summary.after.columns)} cols · ${formatNumber(summary.after.missing_values)} missing`;
             
             // KPIs
             if (data.kpis && data.kpis.length) {
@@ -603,9 +597,10 @@
                     <div class="glass-card p-4">
                         <p class="text-slate-400 text-xs uppercase tracking-wider">${toTitleCase(kpi.label)}</p>
                         <p class="text-white text-xl font-bold mt-2">${kpi.value}</p>
-                        <p class="text-slate-500 text-xs mt-2 flex items-center gap-1">
-                            <span class="${kpi.change >= 0 ? 'text-emerald-400' : 'text-red-400'}">${kpi.change >= 0 ? '↑' : '↓'}</span>
-                            <span>${Math.abs(kpi.change)}% trend</span>
+                        <p class="text-slate-500 text-xs mt-2">${kpi.detail || ''}</p>
+                        <p class="text-slate-500 text-xs mt-1 flex items-center gap-1">
+                            <span class="${kpi.trend >= 0 ? 'text-emerald-400' : 'text-red-400'}">${kpi.trend >= 0 ? '↑' : '↓'}</span>
+                            <span>${Math.abs(kpi.trend)}% trend</span>
                         </p>
                     </div>
                 `).join('');
@@ -632,47 +627,40 @@
                         </div>
                         <h4 class="text-white font-medium text-sm mb-3">${chart.title}</h4>
                         <div id="${chartId}" class="chart-wrapper"></div>
-                        <p class="text-slate-400 text-xs mt-4 italic">${chart.insight || 'Relationship analysis based on data patterns.'}</p>
+                        <p class="text-slate-400 text-xs mt-4 italic">${chart.explanation || 'Analysis based on data patterns.'}</p>
                     `;
                     chartsContainer.appendChild(card);
                     
                     if (chart.figure) {
-                        Plotly.newPlot(chartId, chart.figure.data, chart.figure.layout, {
+                        Plotly.newPlot(chartId, chart.figure.data, chart.figure.layout, chart.config || {
                             responsive: true,
                             displayModeBar: false,
                             displaylogo: false
                         });
                         
                         const btn = card.querySelector(`[data-download="${chartId}"]`);
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            Plotly.downloadImage(chartId, {
-                                format: 'png',
-                                filename: chart.title.toLowerCase().replace(/[^a-z0-9]/g, '_'),
-                                scale: 1.5
+                        if (btn) {
+                            btn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                Plotly.downloadImage(chartId, {
+                                    format: 'png',
+                                    filename: chart.title.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+                                    scale: 1.5
+                                });
                             });
-                        });
+                        }
                     }
                 });
             }
             
-            // Insights
-            if (data.insights && data.insights.length) {
-                const icons = {
-                    quality: '📊',
-                    performance: '🏆',
-                    trend: '📈',
-                    correlation: '🔗',
-                    outlier: '⚠️'
-                };
-                
-                document.getElementById('insightsList').innerHTML = data.insights.map(insight => `
-                    <div class="bg-white/5 rounded-xl p-4 transition-all hover:bg-white/10">
+            // Narrative Insights (from generate_narrative)
+            if (data.narrative && data.narrative.length) {
+                document.getElementById('narrativeList').innerHTML = data.narrative.map(insight => `
+                    <div class="rounded-xl p-4 transition-all hover:bg-white/5 ${getToneStyle(insight.tone)}">
                         <div class="flex items-start gap-3">
-                            <span class="text-xl">${icons[insight.icon] || '💡'}</span>
                             <div>
-                                <p class="text-white font-medium text-sm">${insight.title}</p>
-                                <p class="text-slate-400 text-sm mt-1 leading-relaxed">${insight.content}</p>
+                                <p class="text-white font-semibold text-sm">${insight.title}</p>
+                                <p class="text-slate-300 text-sm mt-1 leading-relaxed">${insight.body}</p>
                             </div>
                         </div>
                     </div>
@@ -687,7 +675,7 @@
                     </tr>
                 `;
                 
-                document.getElementById('previewBody').innerHTML = data.preview.rows.slice(0, 8).map(row => `
+                document.getElementById('previewBody').innerHTML = data.preview.rows.map(row => `
                     <tr class="border-b border-white/5">
                         ${row.map(cell => `<td class="py-3 px-3 text-sm text-slate-300">${String(cell).substring(0, 50)}${String(cell).length > 50 ? '...' : ''}</td>`).join('')}
                     </tr>
@@ -695,6 +683,7 @@
             }
         }
         
+        // Download handler
         document.getElementById('downloadBtn').addEventListener('click', () => {
             if (currentDownloadData) {
                 const link = document.createElement('a');
